@@ -29,7 +29,8 @@ export type ReferenceKind =
   | "QTE"
   | "MTG"
   | "ENR"
-  | "CONV";
+  | "CONV"
+  | "BCAST";
 
 /**
  * Build a department-scoped reference, e.g. `BM-LEAD-7F3K2Q9A` (Marketing lead)

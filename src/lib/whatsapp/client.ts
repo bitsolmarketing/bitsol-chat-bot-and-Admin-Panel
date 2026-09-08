@@ -222,34 +222,89 @@ export async function sendList(
   });
 }
 
+/** The picture, clip or file at the top of a template with a media header. */
+export interface TemplateHeaderMedia {
+  format: "IMAGE" | "VIDEO" | "DOCUMENT";
+  /** Public URL Meta can fetch, or a media id already uploaded to the account. */
+  link: string;
+  /** Shown as the file name on a document header. */
+  filename?: string;
+}
+
+export interface TemplateHeader {
+  /** Values for a text header's `{{1}}`, `{{2}}`… */
+  text?: string[];
+  media?: TemplateHeaderMedia;
+}
+
 /**
  * Send a pre-approved template.
  *
  * Required to open a conversation outside the 24-hour customer service window
  * — the broadcast and follow-up features send through this.
+ *
+ * `variables` fills the BODY's `{{1}}`, `{{2}}`… in order. Meta only ever sees
+ * positions: the names in the console are a local convenience and never go on
+ * the wire.
+ *
+ * A template whose placeholders are sent unfilled is rejected with a `#132000`
+ * parameter-count error, so the caller must supply exactly as many values as
+ * the template declares — `validateParameters` in `broadcast.ts` is what
+ * guarantees that for a broadcast.
+ *
+ * The `header` argument is not optional in practice for a template whose
+ * header is an image, video or document. Meta does not store the media that
+ * was approved — the handle on the template exists only for the review — so it
+ * has to be supplied again on every send, and omitting it fails the message
+ * rather than sending it without a picture.
  */
 export async function sendTemplate(
   to: string,
   templateName: string,
   languageCode = "en",
-  variables: string[] = []
+  variables: string[] = [],
+  header?: TemplateHeader
 ): Promise<SendResult> {
+  const components: Array<Record<string, unknown>> = [];
+
+  const headerParameters: Array<Record<string, unknown>> = [];
+
+  if (header?.media) {
+    const { format, link, filename } = header.media;
+    const kind = format.toLowerCase(); // image | video | document
+    headerParameters.push({
+      type: kind,
+      // Meta accepts either `link` (a public URL it fetches) or `id` (media
+      // already uploaded). A value that is all digits can only be an id.
+      [kind]: {
+        ...(/^\d+$/.test(link) ? { id: link } : { link }),
+        ...(filename && kind === "document" ? { filename } : {}),
+      },
+    });
+  }
+
+  for (const text of header?.text ?? []) {
+    headerParameters.push({ type: "text", text });
+  }
+
+  if (headerParameters.length) {
+    components.push({ type: "header", parameters: headerParameters });
+  }
+
+  if (variables.length) {
+    components.push({
+      type: "body",
+      parameters: variables.map((text) => ({ type: "text", text })),
+    });
+  }
+
   return post({
     to,
     type: "template",
     template: {
       name: templateName,
       language: { code: languageCode },
-      ...(variables.length
-        ? {
-            components: [
-              {
-                type: "body",
-                parameters: variables.map((text) => ({ type: "text", text })),
-              },
-            ],
-          }
-        : {}),
+      ...(components.length ? { components } : {}),
     },
   });
 }

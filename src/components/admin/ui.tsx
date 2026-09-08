@@ -110,6 +110,10 @@ const STATUS_TONES: Record<string, string> = {
   PUBLISHED: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
   SENT: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
   PRESENT: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
+  // Meta template review, and per-recipient delivery.
+  APPROVED: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
+  DELIVERED: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
+  READ: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
   // Negative / terminal-bad
   LOST: "bg-rose-500/12 text-rose-700 dark:text-rose-400",
   DROPPED: "bg-rose-500/12 text-rose-700 dark:text-rose-400",
@@ -127,12 +131,15 @@ const STATUS_TONES: Record<string, string> = {
   ON_HOLD: "bg-amber-500/14 text-amber-700 dark:text-amber-400",
   HIGH: "bg-amber-500/14 text-amber-700 dark:text-amber-400",
   LATE: "bg-amber-500/14 text-amber-700 dark:text-amber-400",
+  // A template Meta paused for quality still exists but stops going out.
+  PAUSED: "bg-amber-500/14 text-amber-700 dark:text-amber-400",
   // In flight
   NEW: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
   INQUIRY: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
   OPEN: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
   REQUESTED: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
   ENROLLING: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
+  SENDING: "bg-sky-500/12 text-sky-700 dark:text-sky-400",
 };
 
 export function StatusBadge({ value }: { value: string }) {

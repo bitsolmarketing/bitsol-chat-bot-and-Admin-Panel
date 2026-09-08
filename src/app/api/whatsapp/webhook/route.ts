@@ -4,6 +4,7 @@ import { logEvent } from "@/lib/notify";
 import { verifySignature } from "@/lib/whatsapp/client";
 import { parseInbound, parseStatuses } from "@/lib/whatsapp/parse";
 import { autoReplyEnabled, handleInbound } from "@/lib/whatsapp/handler";
+import { applyStatusUpdate } from "@/lib/whatsapp/broadcast";
 import type { WhatsAppWebhookBody } from "@/lib/whatsapp/types";
 
 export const runtime = "nodejs";
@@ -87,12 +88,26 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const failures = parseStatuses(body).filter((status) => status.status === "failed");
-    for (const failure of failures) {
-      console.warn(
-        "[whatsapp] delivery failed:",
-        failure.id,
-        failure.errors?.[0]?.title ?? "unknown reason"
+    // Delivery receipts. Most belong to ordinary assistant replies and are
+    // dropped by `applyStatusUpdate` after one indexed lookup; the ones that
+    // match a broadcast recipient are what turns the "delivered / recipients"
+    // column on the broadcasts page into a real number rather than a count of
+    // messages Meta merely accepted.
+    for (const status of parseStatuses(body)) {
+      if (!status.id || !status.status) continue;
+
+      if (status.status === "failed") {
+        console.warn(
+          "[whatsapp] delivery failed:",
+          status.id,
+          status.errors?.[0]?.title ?? "unknown reason"
+        );
+      }
+
+      await applyStatusUpdate(
+        status.id,
+        status.status,
+        status.errors?.[0]?.title ?? status.errors?.[0]?.message
       );
     }
 

@@ -73,6 +73,12 @@ const schema = z.object({
   WHATSAPP_VERIFY_TOKEN: optional,
   /** Meta app secret, used to verify the `X-Hub-Signature-256` on every POST. */
   WHATSAPP_APP_SECRET: optional,
+  /**
+   * WhatsApp Business Account ID — a different id from the phone number ID.
+   * Message templates belong to the account, not the number, so every template
+   * call (list, create, delete) is addressed to this and nothing else.
+   */
+  WHATSAPP_WABA_ID: optional,
   WHATSAPP_API_VERSION: z.string().default("v21.0"),
   /** Set false to keep the number connected but stop the bot from replying. */
   WHATSAPP_AUTO_REPLY: bool(true),
@@ -168,10 +174,18 @@ export const config = {
     token: env.WHATSAPP_TOKEN,
     verifyToken: env.WHATSAPP_VERIFY_TOKEN,
     appSecret: env.WHATSAPP_APP_SECRET,
+    wabaId: env.WHATSAPP_WABA_ID,
     apiVersion: env.WHATSAPP_API_VERSION,
     autoReply: env.WHATSAPP_AUTO_REPLY,
     /** Outbound sending is possible (templates, broadcasts, bot replies). */
     enabled: Boolean(env.WHATSAPP_PHONE_ID && env.WHATSAPP_TOKEN),
+    /**
+     * Templates can be listed, created and synced. Separate from `enabled`
+     * because the two need different things: sending needs the phone number
+     * ID, managing templates needs the business account ID and a token
+     * carrying `whatsapp_business_management`.
+     */
+    templatesEnabled: Boolean(env.WHATSAPP_WABA_ID && env.WHATSAPP_TOKEN),
     /** Meta can reach the webhook: verification and signature checks are set. */
     webhookReady: Boolean(env.WHATSAPP_VERIFY_TOKEN && env.WHATSAPP_APP_SECRET),
     /**

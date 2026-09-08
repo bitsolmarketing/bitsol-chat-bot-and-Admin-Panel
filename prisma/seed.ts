@@ -592,6 +592,7 @@ async function seedContent() {
   const templates = [
     {
       key: "mk-lead-ack",
+      metaName: "mk_lead_ack",
       department: "MARKETING" as Department,
       name: "Lead acknowledgement",
       body: "Hi {{1}}, thanks for contacting BITSOL Marketing. Your request {{2}} is logged and our team will call you within one working day.",
@@ -599,6 +600,7 @@ async function seedContent() {
     },
     {
       key: "mk-meeting-confirm",
+      metaName: "mk_meeting_confirm",
       department: "MARKETING" as Department,
       name: "Consultation confirmed",
       body: "Hi {{1}}, your consultation is confirmed for {{2}} at {{3}}. Reference: {{4}}.",
@@ -606,6 +608,7 @@ async function seedContent() {
     },
     {
       key: "in-admission-ack",
+      metaName: "in_admission_ack",
       department: "INSTITUTE" as Department,
       name: "Admission inquiry acknowledgement",
       body: "Assalam-o-Alaikum {{1}}, your admission inquiry for {{2}} is registered ({{3}}). An admission officer will call you shortly.",
@@ -613,6 +616,7 @@ async function seedContent() {
     },
     {
       key: "in-batch-reminder",
+      metaName: "in_batch_reminder",
       department: "INSTITUTE" as Department,
       name: "Batch starting reminder",
       body: "Reminder: your {{1}} batch starts on {{2}}. Timings: {{3}}. Please confirm your seat.",
@@ -620,6 +624,7 @@ async function seedContent() {
     },
     {
       key: "in-fee-reminder",
+      metaName: "in_fee_reminder",
       department: "INSTITUTE" as Department,
       name: "Fee instalment reminder",
       body: "Hi {{1}}, your next fee instalment of {{2}} is due on {{3}}. Please visit the office or contact us to arrange payment.",
@@ -627,14 +632,18 @@ async function seedContent() {
     },
   ];
 
+  // Seeded as DRAFT, never APPROVED. These are starting points for wording,
+  // not templates Meta has reviewed — and a broadcast refuses to send anything
+  // that has not actually been approved in the WhatsApp Business Account.
+  // Admin ▸ Messaging ▸ WhatsApp Templates submits them and syncs the verdict.
   for (const template of templates) {
     await prisma.whatsappTemplate.upsert({
       where: { key: template.key },
       update: { name: template.name, body: template.body, variables: template.variables },
-      create: template,
+      create: { ...template, status: "DRAFT" as const, languageCode: "en" },
     });
   }
-  console.log(`   ✔ WhatsApp templates: ${templates.length}`);
+  console.log(`   ✔ WhatsApp templates: ${templates.length} (drafts — submit them to Meta to use)`);
 
   const announcements = [
     {

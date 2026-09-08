@@ -212,10 +212,14 @@ lists — nobody types a budget range correctly in four languages. See
 1. In [Meta for Developers](https://developers.facebook.com/), create a Business
    app and add the **WhatsApp** product.
 2. From **WhatsApp ▸ API Setup**, copy the **Phone number ID** into
-   `WHATSAPP_PHONE_ID`.
+   `WHATSAPP_PHONE_ID`, and the **WhatsApp Business Account ID** shown just above
+   it into `WHATSAPP_WABA_ID`. They are different ids: messages are sent from the
+   number, but templates belong to the account.
 3. Create a **System User** with the `whatsapp_business_messaging` permission and
    generate a **permanent** token → `WHATSAPP_TOKEN`. (The 24-hour token on the
-   setup page is for testing only.)
+   setup page is for testing only.) Add `whatsapp_business_management` as well if
+   you want to sync and submit templates from the admin console — sending works
+   without it, managing templates does not.
 4. Copy the **App secret** from **App settings ▸ Basic** → `WHATSAPP_APP_SECRET`.
    Every inbound webhook is HMAC-verified against it; without it the webhook
    rejects all traffic, because the callback URL is public.

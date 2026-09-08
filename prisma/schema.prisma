@@ -250,6 +250,41 @@ enum BroadcastStatus {
   FAILED
 }
 
+/// Lifecycle of a message template, mirroring Meta's own review states.
+///
+/// `DRAFT` is the one state Meta does not have: a template written here but
+/// never submitted for approval. Everything from `PENDING` onwards is Meta's
+/// verdict, refreshed by a sync — and only `APPROVED` may actually be sent.
+enum TemplateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+/// Meta's template categories. The category decides which pricing conversation
+/// the template opens, and Meta will not let it change after approval.
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+/// Per-recipient delivery state inside a broadcast.
+///
+/// `SENT` means Meta accepted the message, which is not the same as it having
+/// arrived — `DELIVERED` and `READ` are set only when Meta's webhook says so.
+enum BroadcastRecipientStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
 enum LogLevel {
   DEBUG
   INFO
@@ -288,6 +323,7 @@ model User {
   activities        CrmActivity[]    @relation("ActivityOwner")
   notifications     Notification[]
   systemLogs        SystemLog[]
+  broadcasts        Broadcast[]      @relation("BroadcastAuthor")
   customer          Customer?
   student           Student?
   faculty           Faculty?
@@ -1020,27 +1056,74 @@ model WhatsappContact {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
+  broadcastRows  BroadcastRecipient[]
+
   @@index([department])
   @@index([lastInboundAt])
   @@map("whatsapp_contacts")
 }
 
+/// A WhatsApp message template, as Meta knows it.
+///
+/// Meta owns the truth here: a template is created in (or synced from) the
+/// WhatsApp Business Account, reviewed, and only then may it be sent. This
+/// table is a local mirror so the console can list, filter and compose against
+/// templates without a Graph call on every page load — `syncedAt` says how
+/// stale that mirror is.
+///
+/// Rows with no `metaId` were written here and never submitted; they are
+/// `DRAFT` and cannot be broadcast.
 model WhatsappTemplate {
   id          String     @id @default(cuid())
+  /// Local, human-chosen key — what the app's own code refers to a template by
+  /// (`in-fee-reminder`). Independent of Meta's naming rules.
   key         String     @unique
-  department  Department
+  /// The name Meta knows it by: lowercase, digits and underscores only. Unique
+  /// per language in the WhatsApp Business Account, which is why the uniqueness
+  /// constraint below is on the pair and not on the name alone.
+  metaName    String
+  /// Meta's template id, present once the template exists in the WABA.
+  metaId      String?    @unique
+  /// Null for a template synced from Meta that nobody has assigned to a
+  /// business yet — it is visible to both until someone picks one.
+  department  Department?
   name        String
   language    Language   @default(EN)
+  /// Meta's own language code (`en`, `en_US`, `ur`). The `language` enum above
+  /// is this product's four languages; Meta's list is far longer, so the code
+  /// that actually goes on the wire is stored separately.
+  languageCode String    @default("en")
+  category    TemplateCategory @default(UTILITY)
+  status      TemplateStatus   @default(DRAFT)
+  /// The BODY component's text, with Meta's `{{1}}` placeholders intact.
   body        String
-  /// Placeholder names in order, e.g. ["name", "courseName"].
+  /// HEADER text, when the header is a text header.
+  headerText  String?
+  /// HEADER format — TEXT, IMAGE, VIDEO, DOCUMENT — or null for no header.
+  headerFormat String?
+  footerText  String?
+  /// The BUTTONS component, verbatim from Meta.
+  buttons     Json?
+  /// Every component exactly as Meta returned it, so a future feature can read
+  /// a field this schema does not model yet without a re-sync.
+  components  Json?
+  /// Placeholder names in order, e.g. ["name", "courseName"]. Purely a label
+  /// for the composer — Meta only ever sees positional parameters.
   variables   String[]
-  isApproved  Boolean    @default(false)
+  /// Meta's reason when `status` is REJECTED, quoted verbatim for the appeal.
+  rejectedReason String?
+  /// Meta's delivery quality signal (GREEN / YELLOW / RED) once there is data.
+  qualityScore String?
+  /// When this row last matched Meta. Null means it has never been synced.
+  syncedAt    DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   broadcasts Broadcast[]
 
+  @@unique([metaName, languageCode])
   @@index([department])
+  @@index([status])
   @@map("whatsapp_templates")
 }
 
@@ -1051,20 +1134,80 @@ model Broadcast {
   channel     NotificationChannel @default(WHATSAPP)
   status      BroadcastStatus @default(DRAFT)
   title       String
+  /// The template body with this broadcast's parameters substituted in — what
+  /// a recipient actually reads. Kept as text so the list stays readable even
+  /// after the template is edited or deleted in Meta.
   body        String
   /// Saved audience filter, e.g. { stage: "QUALIFIED", courseSlug: "seo" }.
   audience    Json?
   templateId  String?
   template    WhatsappTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  /// Template name and language captured at send time. A template can be
+  /// renamed or deleted in Meta; a sent broadcast must still say what it sent.
+  templateName String?
+  languageCode String?
+  /// Public URL of the image, video or document for a template whose header is
+  /// media rather than text. Meta does not keep the picture that was approved —
+  /// the handle in the template is only for review — so a media header has to
+  /// be supplied again on every single send, or Meta rejects the message.
+  headerMediaUrl String?
+  /// How each `{{n}}` was filled: an ordered list of parameter sources, e.g.
+  /// [{ "kind": "contactName" }, { "kind": "static", "value": "20%" }].
+  parameters  Json?
   scheduledAt DateTime?
+  startedAt   DateTime?
   sentAt      DateTime?
   recipients  Int             @default(0)
+  /// Accepted by Meta. Delivery is a separate, later fact — see `delivered`.
+  sent        Int             @default(0)
   delivered   Int             @default(0)
+  readCount   Int             @default(0)
+  failed      Int             @default(0)
+  /// Why the run stopped, when it stopped badly.
+  error       String?
+  createdById String?
+  createdBy   User?           @relation("BroadcastAuthor", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  recipientRows BroadcastRecipient[]
+
   @@index([status])
   @@map("broadcasts")
+}
+
+/// One row per person a broadcast was sent to.
+///
+/// Counters on `Broadcast` alone cannot answer "did Ali get it?", and Meta's
+/// delivery receipts arrive minutes later on a webhook keyed by message id —
+/// so the message id has to be stored somewhere it can be looked up. This is
+/// that table, and it doubles as the record of who has already been messaged,
+/// which is what makes a resumed or retried run safe.
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contactId   String?
+  contact     WhatsappContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  /// E.164 digits with no leading `+`, as Meta wants them.
+  waId        String
+  phone       String
+  name        String?
+  /// The body parameters actually sent, in order — kept so a failed send can
+  /// be retried without recomputing them from an audience that has moved on.
+  parameters  String[]
+  status      BroadcastRecipientStatus @default(PENDING)
+  /// Meta's `wamid.…`. Unique because it is the key delivery receipts arrive on.
+  messageId   String?   @unique
+  error       String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([broadcastId, waId])
+  @@index([broadcastId, status])
+  @@map("broadcast_recipients")
 }
 
 model Notification {
