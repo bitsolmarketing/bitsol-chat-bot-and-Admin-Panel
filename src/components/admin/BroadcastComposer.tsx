@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Megaphone, Users } from "lucide-react";
+import { Loader2, Megaphone, Upload, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, Textarea } from "@/components/ui/field";
@@ -56,6 +56,20 @@ const PARAMETER_LABELS: Record<ParameterKind, string> = {
 /** Header formats that carry a file Meta needs handed to it on every send. */
 const MEDIA_HEADERS = new Set(["IMAGE", "VIDEO", "DOCUMENT"]);
 
+/** What the server made of an uploaded list. */
+interface ImportReport {
+  total: number;
+  valid: number;
+  invalid: number;
+  duplicates: number;
+  optedOut: number;
+  blocked: number;
+  sendable: number;
+  known: number;
+  samples: Array<{ raw: string; reason: string }>;
+  preview: Array<{ phone: string; name: string | null }>;
+}
+
 function countPlaceholders(text: string): number {
   const found = text.match(/\{\{\s*(\d+)\s*\}\}/g);
   if (!found) return 0;
@@ -91,6 +105,10 @@ export function BroadcastComposer({
   const [templateId, setTemplateId] = useState("");
   const [parameters, setParameters] = useState<ParameterDraft[]>([]);
   const [headerMediaUrl, setHeaderMediaUrl] = useState("");
+  const [audienceKind, setAudienceKind] = useState<"segment" | "list">("segment");
+  const [numbers, setNumbers] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const [includeUnrouted, setIncludeUnrouted] = useState(false);
   const [activeWithinDays, setActiveWithinDays] = useState<string>("");
   const [limit, setLimit] = useState<string>("");
@@ -128,10 +146,10 @@ export function BroadcastComposer({
     if (templateId && !available.some((t) => t.id === templateId)) setTemplateId("");
   }, [available, templateId]);
 
-  // Live audience count. Debounced because the day and limit fields fire on
-  // every keystroke, and each change is a database count.
+  // Live audience count for a segment. Debounced because the day and limit
+  // fields fire on every keystroke, and each change is a database count.
   useEffect(() => {
-    if (!open) return;
+    if (!open || audienceKind !== "segment") return;
     let cancelled = false;
     setCounting(true);
 
@@ -160,7 +178,54 @@ export function BroadcastComposer({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, business, includeUnrouted, activeWithinDays, limit]);
+  }, [open, audienceKind, business, includeUnrouted, activeWithinDays, limit]);
+
+  // The same parse the create endpoint will run, so what the report says is
+  // what will happen. Debounced harder than the segment count: this one is
+  // fired by typing or pasting thousands of lines.
+  useEffect(() => {
+    if (!open || audienceKind !== "list") return;
+
+    if (!numbers.trim()) {
+      setImportReport(null);
+      setReach(null);
+      return;
+    }
+
+    let cancelled = false;
+    setImporting(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/admin/broadcasts/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: numbers }),
+        });
+        const data = (await res.json().catch(() => null)) as ImportReport | null;
+        if (cancelled) return;
+        if (res.ok && data) {
+          setImportReport(data);
+          setReach(data.sendable);
+        } else {
+          setImportReport(null);
+          setReach(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setImportReport(null);
+          setReach(null);
+        }
+      } finally {
+        if (!cancelled) setImporting(false);
+      }
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, audienceKind, numbers]);
 
   const previewValues = parameters.map((parameter) =>
     parameter.kind === "static"
@@ -193,7 +258,9 @@ export function BroadcastComposer({
                 ? { kind: "contactPhone" }
                 : { kind: "contactName", fallback: parameter.fallback.trim() || undefined }
           ),
+          numbers: audienceKind === "list" ? numbers : undefined,
           audience: {
+            kind: audienceKind,
             includeUnrouted,
             activeWithinDays: activeWithinDays ? Number(activeWithinDays) : null,
             limit: limit ? Number(limit) : null,
@@ -393,53 +460,171 @@ export function BroadcastComposer({
       <div className="space-y-2.5 rounded-xl border bg-background p-3">
         <p className="text-xs font-medium">Audience</p>
 
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={includeUnrouted}
-            onChange={(e) => setIncludeUnrouted(e.target.checked)}
-            className="size-3.5 accent-[hsl(var(--primary))]"
-          />
-          Also include contacts who have not been routed to a business yet
-        </label>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Field
-            label="Only contacts active in the last…"
-            hint="Days. Leave blank for everyone. A number that has been silent for a year is the one most likely to report the message."
-          >
-            <Input
-              type="number"
-              min={1}
-              max={3650}
-              value={activeWithinDays}
-              onChange={(e) => setActiveWithinDays(e.target.value)}
-              placeholder="90"
-              className="h-9 text-xs"
-            />
-          </Field>
-
-          <Field label="Cap the number of recipients" hint="Blank means no cap.">
-            <Input
-              type="number"
-              min={1}
-              max={5000}
-              value={limit}
-              onChange={(e) => setLimit(e.target.value)}
-              placeholder="500"
-              className="h-9 text-xs"
-            />
-          </Field>
+        <div className="flex gap-1 rounded-xl bg-secondary/60 p-1">
+          {(
+            [
+              ["segment", "Existing contacts"],
+              ["list", "Upload numbers"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setAudienceKind(value);
+                setReach(null);
+              }}
+              className={`flex-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                audienceKind === value
+                  ? "bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
+        {audienceKind === "segment" ? (
+          <>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={includeUnrouted}
+                onChange={(e) => setIncludeUnrouted(e.target.checked)}
+                className="size-3.5 accent-[hsl(var(--primary))]"
+              />
+              Also include contacts who have not been routed to a business yet
+            </label>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field
+                label="Only contacts active in the last…"
+                hint="Days. Leave blank for everyone. A number that has been silent for a year is the one most likely to report the message."
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={activeWithinDays}
+                  onChange={(e) => setActiveWithinDays(e.target.value)}
+                  placeholder="90"
+                  className="h-9 text-xs"
+                />
+              </Field>
+
+              <Field label="Cap the number of recipients" hint="Blank means no cap.">
+                <Input
+                  type="number"
+                  min={1}
+                  max={5000}
+                  value={limit}
+                  onChange={(e) => setLimit(e.target.value)}
+                  placeholder="500"
+                  className="h-9 text-xs"
+                />
+              </Field>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary">
+                <Upload className="size-3.5" />
+                Choose a CSV or text file
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv,text/plain"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setNumbers(await file.text());
+                    // Let the same file be picked again after an edit.
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {numbers && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  onClick={() => {
+                    setNumbers("");
+                    setImportReport(null);
+                    setReach(null);
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            <Field
+              label="Numbers"
+              hint="One per line, or a CSV with the number first and a name second. 0300…, +92 300…, 92300… and 300… are all understood; duplicates and opt-outs are removed."
+            >
+              <Textarea
+                value={numbers}
+                onChange={(e) => setNumbers(e.target.value)}
+                placeholder={"03001234567, Ali Raza\n+92 321 9876543, Sadia Khan\n03339998877"}
+                className="min-h-[120px] font-mono text-xs"
+              />
+            </Field>
+
+            {importReport && (
+              <div className="space-y-1.5 rounded-xl border bg-secondary/40 p-2.5 text-[11px]">
+                <p>
+                  <span className="font-semibold">{importReport.valid}</span> number
+                  {importReport.valid === 1 ? "" : "s"} read
+                  {importReport.known > 0 && ` · ${importReport.known} already in the CRM`}
+                  {importReport.valid - importReport.known > 0 &&
+                    ` · ${importReport.valid - importReport.known} new`}
+                </p>
+                {(importReport.duplicates > 0 ||
+                  importReport.invalid > 0 ||
+                  importReport.optedOut > 0 ||
+                  importReport.blocked > 0) && (
+                  <p className="text-muted-foreground">
+                    Skipped:
+                    {importReport.duplicates > 0 && ` ${importReport.duplicates} duplicate`}
+                    {importReport.invalid > 0 && ` · ${importReport.invalid} not a number`}
+                    {importReport.optedOut > 0 && ` · ${importReport.optedOut} opted out`}
+                    {importReport.blocked > 0 && ` · ${importReport.blocked} blocked`}
+                  </p>
+                )}
+                {importReport.preview.length > 0 && (
+                  <p className="font-mono text-muted-foreground">
+                    {importReport.preview
+                      .map((row) => `${row.phone}${row.name ? ` (${row.name})` : ""}`)
+                      .join(" · ")}
+                    {importReport.valid > importReport.preview.length && " …"}
+                  </p>
+                )}
+                {importReport.samples.length > 0 && (
+                  <p className="text-amber-700 dark:text-amber-400">
+                    Ignored: {importReport.samples.map((s) => `"${s.raw}" (${s.reason})`).join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         <p className="flex items-center gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1.5 text-xs">
-          {counting ? (
+          {counting || importing ? (
             <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
           ) : (
             <Users className="size-3.5 text-muted-foreground" />
           )}
           {reach === null ? (
-            <span className="text-muted-foreground">Counting the audience…</span>
+            <span className="text-muted-foreground">
+              {audienceKind === "list"
+                ? "Paste or upload numbers to see how many can be messaged."
+                : "Counting the audience…"}
+            </span>
           ) : (
             <span>
               <span className="font-semibold">{reach}</span> contact{reach === 1 ? "" : "s"} will
@@ -465,6 +650,7 @@ export function BroadcastComposer({
             !template ||
             !title.trim() ||
             reach === 0 ||
+            (audienceKind === "list" && !importReport?.sendable) ||
             (needsMedia && !headerMediaUrl.trim())
           }
           className="gap-1.5"

@@ -5,8 +5,10 @@ import { getSession } from "@/lib/session";
 import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
 import { logEvent } from "@/lib/notify";
 import { generateReference } from "@/lib/utils";
+import { parseNumberList } from "@/lib/whatsapp/numbers";
 import {
   countAudience,
+  importContacts,
   parseParameters,
   prepareBroadcast,
   previewBody,
@@ -44,13 +46,17 @@ const schema = z.object({
   parameters: z.array(parameterSchema).max(20).default([]),
   /** Required when the template header is an image, video or document. */
   headerMediaUrl: z.string().url().max(2000).optional(),
+  /** Pasted numbers or CSV text, when the audience is an uploaded list. */
+  numbers: z.string().max(1_000_000).optional(),
+  countryCode: z.string().regex(/^\d{1,4}$/).default("92"),
   audience: z
     .object({
+      kind: z.enum(["segment", "list"]).default("segment"),
       includeUnrouted: z.boolean().default(false),
       activeWithinDays: z.number().int().positive().max(3650).nullable().default(null),
       limit: z.number().int().positive().max(5000).nullable().default(null),
     })
-    .default({ includeUnrouted: false, activeWithinDays: null, limit: null }),
+    .default({ kind: "segment", includeUnrouted: false, activeWithinDays: null, limit: null }),
   scheduledAt: z.string().datetime({ offset: true }).optional(),
 });
 
@@ -116,7 +122,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // An uploaded list becomes contacts before it becomes an audience. That is
+  // what makes opt-out work for these numbers from here on: a STOP reply is
+  // recorded against a contact row, so without one the person could never
+  // remove themselves from a later campaign.
+  let waIds: string[] = [];
+  if (draft.audience.kind === "list") {
+    if (!draft.numbers?.trim()) {
+      return Response.json(
+        { error: "No numbers were uploaded for this broadcast." },
+        { status: 400 }
+      );
+    }
+
+    const list = parseNumberList(draft.numbers, draft.countryCode);
+    if (!list.valid.length) {
+      return Response.json(
+        {
+          error: `None of the ${list.invalid.length} line(s) in that list were usable phone numbers.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    waIds = await importContacts(list.valid, draft.department);
+  }
+
   const audience = {
+    kind: draft.audience.kind,
+    waIds,
     department: draft.department,
     includeUnrouted: draft.audience.includeUnrouted,
     activeWithinDays: draft.audience.activeWithinDays,
@@ -128,7 +162,9 @@ export async function POST(req: NextRequest) {
     return Response.json(
       {
         error:
-          "That audience matches nobody right now. Contacts who opted out or were blocked are always excluded.",
+          draft.audience.kind === "list"
+            ? "Every number on that list has opted out or is blocked, so there is nobody left to message."
+            : "That audience matches nobody right now. Contacts who opted out or were blocked are always excluded.",
       },
       { status: 400 }
     );
@@ -146,7 +182,12 @@ export async function POST(req: NextRequest) {
       // The rendered body, so the list stays readable even after the template
       // is renamed or deleted in Meta.
       body: previewBody(template.body, sources),
+      // Stored so the run can be rebuilt later — a resumed or refreshed
+      // broadcast has to reach the same people, and for an uploaded list the
+      // only record of who that was is the list itself.
       audience: {
+        kind: audience.kind,
+        ...(audience.kind === "list" ? { waIds } : {}),
         includeUnrouted: audience.includeUnrouted,
         activeWithinDays: audience.activeWithinDays,
         limit: audience.limit,

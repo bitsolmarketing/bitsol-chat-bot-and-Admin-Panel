@@ -47,7 +47,21 @@ const MAX_RECIPIENTS = 5_000;
 
 // -------------------------------------------------------------- Audience ----
 
+/**
+ * An audience is either a segment of the people who have messaged this
+ * business, or an explicit list of numbers someone uploaded.
+ *
+ * They converge before anything is sent: an uploaded number becomes a
+ * `WhatsappContact` row like any other, so a later STOP from that person is
+ * recorded against it and removes them from every future broadcast. Keeping
+ * uploaded numbers outside the contact table would mean opt-outs silently did
+ * not apply to them, which is the one failure mode that must not exist.
+ */
 export interface AudienceFilter {
+  /** `segment` (a query) or `list` (uploaded numbers). Absent means segment. */
+  kind?: "segment" | "list";
+  /** For `list`: the numbers to message, already normalised to Meta's wa_id. */
+  waIds?: string[];
   /** Contacts routed to this business. */
   department: Department;
   /**
@@ -79,6 +93,15 @@ export function audienceWhere(filter: AudienceFilter): Prisma.WhatsappContactWhe
     optedOut: false,
     isBlocked: false,
   };
+
+  // An uploaded list is already the audience. It is still filtered by opt-out
+  // and block above — the upload says who was *asked* for, not who may be
+  // messaged — but department and activity do not apply: the person chose
+  // these numbers explicitly.
+  if (filter.kind === "list") {
+    where.waId = { in: filter.waIds ?? [] };
+    return where;
+  }
 
   if (filter.includeUnrouted) {
     where.OR = [{ department: filter.department }, { department: null }];
@@ -115,6 +138,41 @@ export async function resolveAudience(filter: AudienceFilter): Promise<WhatsappC
     orderBy: { lastInboundAt: "desc" },
     take: Math.min(filter.limit ?? MAX_RECIPIENTS, MAX_RECIPIENTS),
   });
+}
+
+// ------------------------------------------------------- Uploaded numbers ---
+
+/**
+ * Add an uploaded list to the contact table, and return the wa_ids.
+ *
+ * `createMany` with `skipDuplicates` gives exactly the semantics wanted here in
+ * one query: numbers this business has never seen become contacts, and numbers
+ * it already knows are left completely alone. That second half matters —
+ * an existing contact's WhatsApp profile name is better data than a name typed
+ * into a spreadsheet, their department was set by an actual conversation, and
+ * an upload must never quietly clear someone's opt-out.
+ *
+ * New contacts get `lastInboundAt` of null, which is the truth: they have
+ * never messaged this business. The inbox reads that as "no messages yet"
+ * rather than pretending a conversation happened.
+ */
+export async function importContacts(
+  entries: Array<{ waId: string; phone: string; name?: string }>,
+  department: Department
+): Promise<string[]> {
+  if (!entries.length) return [];
+
+  await prisma.whatsappContact.createMany({
+    data: entries.map((entry) => ({
+      waId: entry.waId,
+      phone: entry.phone,
+      profileName: entry.name ?? null,
+      department,
+    })),
+    skipDuplicates: true,
+  });
+
+  return entries.map((entry) => entry.waId);
 }
 
 // ------------------------------------------------------------ Parameters ----
@@ -272,6 +330,8 @@ export async function prepareBroadcast(broadcastId: string): Promise<PrepareOutc
 
   const filter = (broadcast.audience ?? {}) as Partial<AudienceFilter>;
   const contacts = await resolveAudience({
+    kind: filter.kind ?? "segment",
+    waIds: filter.waIds ?? [],
     department: broadcast.department,
     includeUnrouted: filter.includeUnrouted ?? false,
     activeWithinDays: filter.activeWithinDays ?? null,
