@@ -5,16 +5,34 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import { BitsolBranding } from "@/components/branding/BitsolBranding";
 import { Logo } from "@/components/branding/Logo";
 import { BRAND } from "@/lib/brands";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { OG_IMAGE, breadcrumbJsonLd, conciergeJsonLd } from "@/lib/site";
+
+const CHAT_TITLE = "Chat with Our AI Concierge: Free Quotes 24/7";
+const CHAT_DESCRIPTION = `Ask the ${BRAND.name} AI concierge about AI chatbots, WhatsApp automation, websites and marketing. Get pricing, a quote or a free consultation in English or Urdu.`;
 
 export const metadata: Metadata = {
-  title: "AI Concierge",
-  description: `Talk to the ${BRAND.name} AI concierge — services, pricing, quotes and free consultations, 24/7, in English, Urdu, Roman Urdu or Punjabi.`,
+  title: CHAT_TITLE,
+  description: CHAT_DESCRIPTION,
+  alternates: { canonical: "/chat" },
+  openGraph: { url: "/chat", title: `${CHAT_TITLE} | ${BRAND.name}`, description: CHAT_DESCRIPTION, images: [OG_IMAGE] },
 };
 
 export default function ChatPage() {
   return (
     <div className="dark brand-gradient relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-0 sm:p-6">
+      <JsonLd
+        graph={[
+          conciergeJsonLd(),
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "AI Concierge", path: "/chat" },
+          ]),
+        ]}
+      />
       <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden />
+      {/* The widget has no visible page heading; this names the page for search engines and screen readers. */}
+      <h1 className="sr-only">{BRAND.name} AI Concierge: services, pricing, quotes and consultations</h1>
 
       <div className="ring-gradient relative flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-brand-ink/80 shadow-glow backdrop-blur-xl sm:h-[min(92dvh,960px)] sm:rounded-[1.75rem]">
         {/* Widget header */}

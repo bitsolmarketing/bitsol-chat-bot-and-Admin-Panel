@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -19,6 +20,21 @@ import { Footer } from "@/components/branding/Footer";
 import { LogoMark } from "@/components/branding/Logo";
 import { BRAND } from "@/lib/brands";
 import { MARKETING_SERVICES } from "@/data/marketing/services";
+import { JsonLd } from "@/components/seo/JsonLd";
+import {
+  SEO,
+  conciergeJsonLd,
+  organizationRef,
+  serviceCatalogJsonLd,
+  websiteJsonLd,
+} from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: { absolute: SEO.homeTitle },
+  description: SEO.homeDescription,
+  alternates: { canonical: "/" },
+  openGraph: { url: "/", title: SEO.homeTitle, description: SEO.homeDescription },
+};
 
 /** Facts, not flourishes — every figure here is true of the product today. */
 const PROOF = [
@@ -66,6 +82,14 @@ const CONCIERGE = [
 export default function HomePage() {
   return (
     <>
+      <JsonLd
+        graph={[
+          { ...organizationRef, hasOfferCatalog: { "@id": serviceCatalogJsonLd()["@id"] } },
+          websiteJsonLd(),
+          conciergeJsonLd(),
+          serviceCatalogJsonLd(),
+        ]}
+      />
       <SplashScreen />
 
       <div className="dark min-h-dvh bg-background text-foreground">

@@ -4,41 +4,46 @@ import "@fontsource-variable/montserrat";
 import "./globals.css";
 import { BRANDING } from "@/lib/branding";
 import { BRAND } from "@/lib/brands";
+import { SEO, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: `${BRAND.name} · ${BRANDING.product.name}`,
-    template: `%s · ${BRAND.name}`,
+    default: SEO.homeTitle,
+    template: `%s | ${BRAND.name}`,
   },
-  description:
-    "The AI concierge for BITSOL Marketing — AI chatbots, WhatsApp automation, AI agents, websites, software, digital marketing and brand. Quotes and consultations in English, Urdu, Roman Urdu or Punjabi, 24/7.",
+  description: SEO.homeDescription,
   applicationName: BRANDING.product.name,
   authors: [{ name: BRANDING.developer.name, url: BRANDING.developer.url }],
-  keywords: [
-    "BITSOL",
-    "BITSOL Marketing",
-    "AI chatbot",
-    "WhatsApp automation",
-    "AI agents",
-    "digital marketing",
-    "SEO",
-    "web development",
-    "software development",
-    "branding",
-    "Faisalabad",
-  ],
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  creator: BRAND.name,
+  publisher: BRAND.name,
+  category: "business",
   openGraph: {
-    title: `${BRAND.name} · ${BRANDING.product.name}`,
-    description: BRAND.tagline,
-    siteName: BRAND.name,
     type: "website",
+    siteName: BRAND.name,
+    locale: "en_PK",
+    title: SEO.homeTitle,
+    description: SEO.homeDescription,
   },
-  robots: { index: true, follow: true },
+  // No title here: X falls back to each page's og:title, so every page keeps its own.
+  twitter: { card: "summary_large_image" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export const viewport: Viewport = {
   themeColor: "#050816",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
 };

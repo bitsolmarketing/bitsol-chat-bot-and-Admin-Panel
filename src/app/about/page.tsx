@@ -13,10 +13,17 @@ import { SiteHeader } from "@/components/branding/SiteHeader";
 import { Footer } from "@/components/branding/Footer";
 import { BRANDING, brandName, brandTagline, brandUrl } from "@/lib/branding";
 import { BRAND } from "@/lib/brands";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { OG_IMAGE, ORGANIZATION_ID, SITE_URL, absoluteUrl, breadcrumbJsonLd, conciergeJsonLd } from "@/lib/site";
+
+const ABOUT_TITLE = "About the AI Concierge";
+const ABOUT_DESCRIPTION = `Meet the ${BRAND.name} AI concierge: grounded answers, quotes, consultations and support tickets on web and WhatsApp, 24/7, in four languages.`;
 
 export const metadata: Metadata = {
-  title: "About",
-  description: `About ${BRAND.name} and the BITSOL AI Assistant — the AI concierge that answers, qualifies and books for the firm, 24/7.`,
+  title: ABOUT_TITLE,
+  description: ABOUT_DESCRIPTION,
+  alternates: { canonical: "/about" },
+  openGraph: { url: "/about", title: `${ABOUT_TITLE} | ${BRAND.name}`, description: ABOUT_DESCRIPTION, images: [OG_IMAGE] },
 };
 
 const FEATURES = [
@@ -55,6 +62,24 @@ const FEATURES = [
 export default function AboutPage() {
   return (
     <div className="dark min-h-dvh bg-background text-foreground">
+      <JsonLd
+        graph={[
+          {
+            "@type": "AboutPage",
+            "@id": `${absoluteUrl("/about")}#page`,
+            url: absoluteUrl("/about"),
+            name: ABOUT_TITLE,
+            description: ABOUT_DESCRIPTION,
+            isPartOf: { "@id": `${SITE_URL}/#website` },
+            about: { "@id": ORGANIZATION_ID },
+            mainEntity: { "@id": conciergeJsonLd()["@id"] },
+          },
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "About", path: "/about" },
+          ]),
+        ]}
+      />
       <SiteHeader />
 
       <main>

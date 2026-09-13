@@ -46,6 +46,19 @@ const nextConfig = {
     : {}),
   // Keep server-only packages out of the client/edge bundle (Next 15 top-level key).
   serverExternalPackages: ["@prisma/client", "@anthropic-ai/sdk", "ioredis"],
+  async redirects() {
+    return [
+      // The hosting panel also answers on www.ai.bitsolmarketing.com with the
+      // same pages. Two hosts serving identical content split ranking signals,
+      // so the www host sends everything to the canonical one, permanently.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.ai.bitsolmarketing.com" }],
+        destination: "https://ai.bitsolmarketing.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       // The WhatsApp callback URL registered with Meta is the short, public
@@ -64,6 +77,8 @@ const nextConfig = {
         headers: [
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-Content-Type-Options", value: "nosniff" },
+          // Browsers ignore HSTS on plain-http responses, so local dev is unaffected.
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(self)" },
         ],
