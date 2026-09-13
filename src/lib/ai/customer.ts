@@ -109,7 +109,9 @@ export async function extractCustomerDetails(
       system: extractionPrompt(known),
       messages: [{ role: "user", content: formatTranscript(transcript) }],
       model: config.ai.extractionModel,
-      maxTokens: 700,
+      // Room for the JSON and, on a Gemini model, the thought tokens that
+      // count against the same limit.
+      maxTokens: 1200,
       thinking: false,
     })) {
       raw += chunk;

@@ -42,8 +42,12 @@ export default async function IntegrationsPage() {
       configured: Boolean(
         config.ai.anthropicApiKey || config.ai.openaiApiKey || config.ai.geminiApiKey
       ),
-      detail: `${config.ai.provider} · ${config.ai.model} · max ${config.ai.maxTokens} tokens`,
-      env: "AI_PROVIDER, AI_MODEL, ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY",
+      detail: `${config.ai.provider}${
+        config.ai.provider === "claude" && config.ai.anthropicBaseUrl?.includes("aws-external-anthropic")
+          ? " (Claude Platform on AWS)"
+          : ""
+      } · ${config.ai.model} · max ${config.ai.maxTokens} tokens`,
+      env: "AI_PROVIDER, AI_MODEL, ANTHROPIC_API_KEY (+ ANTHROPIC_BASE_URL, ANTHROPIC_WORKSPACE_ID on AWS) / OPENAI_API_KEY / GEMINI_API_KEY",
     },
     {
       icon: Database,

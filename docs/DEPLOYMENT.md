@@ -32,7 +32,11 @@ Set production values in `.env`:
 - `REDIS_URL` = production Redis — **strongly recommended in production**, or
   rate limiting fails open and allows every request
 - `JWT_SECRET` = `openssl rand -base64 48`
-- `AI_PROVIDER` + the matching API key and `AI_MODEL`
+- `AI_PROVIDER` + the matching API key (`AI_MODEL` is optional — each
+  provider has a default). Free option: `AI_PROVIDER=gemini` with a Google AI
+  Studio key; see the README for its limits.
+- On Claude Platform on AWS, also `ANTHROPIC_BASE_URL`
+  (`https://aws-external-anthropic.<region>.api.aws`) and `ANTHROPIC_WORKSPACE_ID`
 - `AI_EXTRACTION_MODEL` (optional) — a cheaper model from the same provider for
   the per-turn call that reads the customer's details; defaults to `AI_MODEL`
 - `SALES_NOTIFY_EMAIL` — where new leads, meetings, tickets and handoffs are

@@ -145,12 +145,41 @@ Set `AI_PROVIDER` in `.env`:
 | `AI_PROVIDER` | Uses                              | Required env                          |
 | ------------- | --------------------------------- | ------------------------------------- |
 | `claude`      | Anthropic Claude (default)        | `ANTHROPIC_API_KEY`, `AI_MODEL`       |
+| `claude` on AWS | Claude Platform on AWS          | `ANTHROPIC_API_KEY` (AWS console key), `ANTHROPIC_BASE_URL`, `ANTHROPIC_WORKSPACE_ID` |
 | `openai`      | OpenAI / Azure / Together / etc.  | `OPENAI_API_KEY`, `OPENAI_BASE_URL`   |
 | `ollama`      | Local Ollama (OpenAI-compatible)  | `OPENAI_BASE_URL=http://localhost:11434/v1` |
-| `gemini`      | Google Gemini                     | `GEMINI_API_KEY`, `AI_MODEL`          |
+| `gemini`      | Google Gemini (free tier available) | `GEMINI_API_KEY`                    |
 
-`AI_MODEL` defaults to `claude-opus-4-8`. Set `AI_THINKING=true` for Claude
-adaptive thinking (deeper, slower).
+`AI_MODEL` is optional — each provider has a default (`claude-opus-4-8`,
+`gemini-3.1-flash-lite`, `gpt-4o-mini`, `llama3.1`). Set `AI_THINKING=true` for
+Claude adaptive thinking (deeper, slower).
+
+**Running on Google's free tier.** Create a key at
+[aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) (a Google
+account, no card) and set:
+
+```
+AI_PROVIDER=gemini
+GEMINI_API_KEY=AIza…
+```
+
+That runs `gemini-3.1-flash-lite`, which Google serves free of charge with a
+per-day request cap — Google AI Studio shows the current numbers for your
+project. Two things to know before relying on it for real customers: the free
+tier's conversations are used to improve Google's products, and the cap counts
+every model call, of which each customer message makes two (the reply and the
+details extraction). Attaching a billing account to the same key lifts the cap
+and stops the data use; at Flash-Lite prices a thousand customer messages cost
+well under a dollar. `GEMINI_THINKING=low` keeps a Gemini 3 model's thinking
+short so it does not eat the reply's token budget.
+
+**Claude Platform on AWS.** Keep `AI_PROVIDER=claude` and put the key generated
+in the AWS console in `ANTHROPIC_API_KEY`. Set `ANTHROPIC_BASE_URL` to your
+region's endpoint, `https://aws-external-anthropic.<region>.api.aws`, and
+`ANTHROPIC_WORKSPACE_ID` to the `wrkspc_…` id of the workspace in that region.
+Keys from Anthropic's own console don't work there, and AWS keys don't work
+against Anthropic's API — the provider refuses either mismatch at startup with
+a message naming the missing variable.
 
 Every turn also makes a short, JSON-only call that reads the conversation for the
 customer's details. It uses `AI_MODEL` unless `AI_EXTRACTION_MODEL` names a
