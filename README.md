@@ -170,7 +170,7 @@ tier's conversations are used to improve Google's products, and the cap counts
 every model call, of which each customer message makes two (the reply and the
 details extraction). Attaching a billing account to the same key lifts the cap
 and stops the data use; at Flash-Lite prices a thousand customer messages cost
-well under a dollar. `GEMINI_THINKING=low` keeps a Gemini 3 model's thinking
+a dollar or two. `GEMINI_THINKING=low` keeps a Gemini 3 model's thinking
 short so it does not eat the reply's token budget.
 
 **Claude Platform on AWS.** Keep `AI_PROVIDER=claude` and put the key generated
