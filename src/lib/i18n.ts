@@ -189,15 +189,10 @@ export function asLanguage(value: unknown): Language | null {
 type UiKey =
   | "welcome.title"
   | "welcome.subtitle"
-  | "welcome.marketing"
-  | "welcome.institute"
-  | "welcome.marketingHint"
-  | "welcome.instituteHint"
   | "chat.placeholder"
   | "chat.online"
   | "chat.newChat"
   | "chat.menu"
-  | "chat.switch"
   | "chat.voice"
   | "chat.emptyTitle"
   | "chat.disclaimer"
@@ -208,40 +203,16 @@ type UiKey =
 
 const DICTIONARY: Record<UiKey, Record<Language, string>> = {
   "welcome.title": {
-    en: "Welcome to BITSOL",
-    ur: "بِٹسول میں خوش آمدید",
-    ur_roman: "BITSOL mein khush aamdeed",
-    pa: "بِٹسول وچ جی آیاں نوں",
+    en: "How can we grow your business?",
+    ur: "ہم آپ کے کاروبار کو کیسے بڑھا سکتے ہیں؟",
+    ur_roman: "Hum aap ke business ko kaise barha sakte hain?",
+    pa: "اسی تہاڈے کاروبار نوں کیویں ودھا سکدے آں؟",
   },
   "welcome.subtitle": {
-    en: "Please choose how I can assist you today.",
-    ur: "براہِ کرم منتخب کریں کہ میں آج آپ کی کیا مدد کر سکتا ہوں۔",
-    ur_roman: "Bataiye main aaj aap ki kis tarah madad kar sakta hoon.",
-    pa: "دسو، میں اج تہاڈی کیہڑی مدد کر سکنا واں۔",
-  },
-  "welcome.marketing": {
-    en: "BITSOL Marketing",
-    ur: "بِٹسول مارکیٹنگ",
-    ur_roman: "BITSOL Marketing",
-    pa: "بِٹسول مارکیٹنگ",
-  },
-  "welcome.institute": {
-    en: "BITSOL Institute",
-    ur: "بِٹسول انسٹی ٹیوٹ",
-    ur_roman: "BITSOL Institute",
-    pa: "بِٹسول انسٹی ٹیوٹ",
-  },
-  "welcome.marketingHint": {
-    en: "Services, AI automation, websites, quotes & consultations",
-    ur: "خدمات، اے آئی آٹومیشن، ویب سائٹس، قیمت اور مشاورت",
-    ur_roman: "Services, AI automation, websites, quotation aur consultation",
-    pa: "سروسز، اے آئی آٹومیشن، ویب سائٹاں، ریٹ تے مشورہ",
-  },
-  "welcome.instituteHint": {
-    en: "Courses, admissions, fees, batches & career guidance",
-    ur: "کورسز، داخلے، فیس، بیچز اور کیریئر رہنمائی",
-    ur_roman: "Courses, admission, fees, batches aur career guidance",
-    pa: "کورس، داخلے، فیس، بیچ تے کیریئر مشورہ",
+    en: "AI automation, software, digital growth and brand — ask in any language.",
+    ur: "اے آئی آٹومیشن، سافٹ ویئر، ڈیجیٹل گروتھ اور برانڈ — کسی بھی زبان میں پوچھیں۔",
+    ur_roman: "AI automation, software, digital growth aur brand — kisi bhi zabaan mein poochein.",
+    pa: "اے آئی آٹومیشن، سافٹ ویئر، ڈیجیٹل گروتھ تے برانڈ — کسے وی زبان وچ پُچھو۔",
   },
   "chat.placeholder": {
     en: "Ask anything… (English, اردو, Roman Urdu or پنجابی)",
@@ -267,12 +238,6 @@ const DICTIONARY: Record<UiKey, Record<Language, string>> = {
     ur_roman: "Menu",
     pa: "مینو",
   },
-  "chat.switch": {
-    en: "Switch",
-    ur: "تبدیل کریں",
-    ur_roman: "Switch karein",
-    pa: "بدلو",
-  },
   "chat.voice": {
     en: "Voice",
     ur: "آواز",
@@ -286,11 +251,11 @@ const DICTIONARY: Record<UiKey, Record<Language, string>> = {
     pa: "میں اج تہاڈی کیہ مدد کر سکنا واں؟",
   },
   "chat.disclaimer": {
-    en: "The assistant can make mistakes. Please confirm prices, dates and fees with our team.",
-    ur: "اسسٹنٹ سے غلطی ہو سکتی ہے۔ قیمت، تاریخ اور فیس ہماری ٹیم سے تصدیق کر لیں۔",
+    en: "The assistant can make mistakes. Please confirm prices and timelines with our team.",
+    ur: "اسسٹنٹ سے غلطی ہو سکتی ہے۔ قیمت اور وقت ہماری ٹیم سے تصدیق کر لیں۔",
     ur_roman:
-      "Assistant se ghalti ho sakti hai. Price, date aur fees hamari team se confirm kar lein.",
-    pa: "اسسٹنٹ کولوں غلطی ہو سکدی اے۔ ریٹ، تریخ تے فیس ساڈی ٹیم کولوں پکی کر لوو۔",
+      "Assistant se ghalti ho sakti hai. Price aur timeline hamari team se confirm kar lein.",
+    pa: "اسسٹنٹ کولوں غلطی ہو سکدی اے۔ ریٹ تے ٹائم لائن ساڈی ٹیم کولوں پکی کر لوو۔",
   },
   "chat.tryAsking": {
     en: "Try asking about…",

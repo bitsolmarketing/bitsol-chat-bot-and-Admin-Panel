@@ -2,19 +2,32 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Sparkles } from "lucide-react";
-import { BRANDING, brandName } from "@/lib/branding";
-import { BRANDS } from "@/lib/brands";
+import { LogoMark } from "@/components/branding/Logo";
+import { brandName } from "@/lib/branding";
+import { BRAND } from "@/lib/brands";
+
+const SEEN_KEY = "bitsol.splash.seen";
 
 /**
- * Branded splash overlay shown briefly on first load, then fades to reveal the
- * page. Shows the BITSOL umbrella identity and both businesses, since the
- * visitor has not yet chosen between them.
+ * Branded splash overlay shown on the first visit of a browser session, then
+ * fades to reveal the page. Later navigations back to the landing page skip it
+ * — a flourish on arrival, not a toll on every visit.
  */
-export function SplashScreen({ duration = 2000 }: { duration?: number }) {
+export function SplashScreen({ duration = 1600 }: { duration?: number }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem(SEEN_KEY) === "1";
+      sessionStorage.setItem(SEEN_KEY, "1");
+    } catch {
+      // Storage blocked — show it, it is only a second and a half.
+    }
+    if (seen) {
+      setVisible(false);
+      return;
+    }
     const timer = setTimeout(() => setVisible(false), duration);
     return () => clearTimeout(timer);
   }, [duration]);
@@ -25,48 +38,48 @@ export function SplashScreen({ duration = 2000 }: { duration?: number }) {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
-          className="brand-gradient fixed inset-0 z-[100] flex flex-col items-center justify-center text-white"
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="dark brand-gradient fixed inset-0 z-[100] flex flex-col items-center justify-center text-white"
         >
           <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 140, damping: 14 }}
-            className="flex flex-col items-center gap-5"
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center gap-6"
           >
-            <div className="relative">
-              <span className="absolute inset-0 animate-ping rounded-full bg-white/20" />
-              <div className="relative grid size-20 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/30 backdrop-blur-md">
-                <Bot className="size-10" />
-              </div>
+            <div className="relative size-24">
+              <span className="absolute inset-0 animate-ping rounded-full bg-brand-cyan/15" />
+              <span className="absolute -inset-6 rounded-full bg-brand-violet/25 blur-2xl" />
+              <LogoMark className="relative size-full" />
             </div>
 
             <div className="text-center">
-              <h1 className="text-2xl font-bold tracking-tight">
-                {BRANDING.product.name}
-              </h1>
-              <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-white/80">
-                <span>{BRANDS.MARKETING.emoji} {BRANDS.MARKETING.shortName}</span>
-                <span className="text-white/40" aria-hidden>·</span>
-                <span>{BRANDS.INSTITUTE.emoji} {BRANDS.INSTITUTE.shortName}</span>
+              <p className="text-3xl font-extrabold tracking-tight">
+                BITSOL<span className="text-brand-cyan">.</span>
               </p>
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/50">
+                {BRAND.name.replace("BITSOL ", "")}
+              </p>
+            </div>
+
+            <div className="h-px w-40 overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                className="h-full bg-gradient-to-r from-brand-cyan via-brand-blue to-brand-violet"
+                initial={{ x: "-100%" }}
+                animate={{ x: "0%" }}
+                transition={{ duration: duration / 1000, ease: "easeInOut" }}
+              />
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="absolute bottom-10 flex flex-col items-center gap-1 text-xs text-white/70"
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+            className="absolute bottom-10 text-[11px] text-white/45"
           >
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="size-3.5" /> {BRANDING.product.poweredBy}
-            </span>
-            <span>
-              Designed &amp; Developed by{" "}
-              <span className="font-semibold text-white">{brandName}</span>
-            </span>
-          </motion.div>
+            Designed &amp; Developed by <span className="font-semibold text-white/80">{brandName}</span>
+          </motion.p>
         </motion.div>
       )}
     </AnimatePresence>

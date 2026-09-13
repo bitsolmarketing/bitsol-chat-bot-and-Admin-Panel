@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { DEPARTMENT } from "@/lib/brands";
 import { logEvent } from "@/lib/notify";
 import { config } from "@/lib/config";
 import { countPlaceholders, submitTemplate } from "@/lib/whatsapp/templates";
@@ -37,7 +38,6 @@ const schema = z.object({
       "Use lowercase letters, numbers and underscores only — Meta rejects anything else."
     ),
   name: z.string().min(1).max(120),
-  department: z.enum(["MARKETING", "INSTITUTE"]),
   languageCode: z.string().min(2).max(10),
   category: z.enum(["MARKETING", "UTILITY", "AUTHENTICATION"]),
   body: z.string().min(1).max(1024),
@@ -73,13 +73,6 @@ export async function POST(req: NextRequest) {
     );
   }
   const draft = parsed.data;
-
-  if (!canAccessDepartment(session, draft.department)) {
-    return Response.json(
-      { error: "That business is not yours to publish templates for." },
-      { status: 403 }
-    );
-  }
 
   // Meta's uniqueness is name + language, so the same check has to happen here
   // — otherwise the Graph call fails with an opaque duplicate-name error.
@@ -122,7 +115,7 @@ export async function POST(req: NextRequest) {
         metaName: draft.metaName,
         metaId: submitted.data?.id ?? null,
         name: draft.name,
-        department: draft.department,
+        department: DEPARTMENT,
         languageCode: draft.languageCode,
         language: draft.languageCode.toLowerCase().startsWith("ur")
           ? "UR"
@@ -147,7 +140,6 @@ export async function POST(req: NextRequest) {
 
     await logEvent({
       action: "template.submitted",
-      department: draft.department,
       entity: "whatsappTemplate",
       entityId: template.id,
       message: `${session.name} submitted the template "${draft.metaName}" (${draft.languageCode}) to Meta for approval.`,

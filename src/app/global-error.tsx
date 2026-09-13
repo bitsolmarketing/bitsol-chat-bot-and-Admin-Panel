@@ -29,7 +29,9 @@ export default function GlobalError({
           display: "grid",
           placeItems: "center",
           padding: "1.5rem",
-          background: "linear-gradient(160deg, #1b2559, #3b2f8a)",
+          backgroundColor: "#050816",
+          backgroundImage:
+            "radial-gradient(900px 520px at 12% -12%, rgba(0,217,255,0.16), transparent 60%), radial-gradient(900px 560px at 92% -6%, rgba(124,58,237,0.26), transparent 62%)",
           color: "white",
           fontFamily:
             'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
@@ -47,7 +49,7 @@ export default function GlobalError({
               color: "rgba(255,255,255,0.75)",
             }}
           >
-            The BITSOL AI Assistant hit an unexpected error. Please try again — if it
+            The BITSOL Marketing assistant hit an unexpected error. Please try again — if it
             keeps happening, contact us and we&apos;ll look into it.
           </p>
 
@@ -72,10 +74,10 @@ export default function GlobalError({
               padding: "0.625rem 1.5rem",
               borderRadius: "9999px",
               border: "none",
-              background: "white",
-              color: "#1b2559",
+              backgroundImage: "linear-gradient(135deg, #2563EB, #7C3AED)",
+              color: "white",
               fontSize: "0.875rem",
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: "pointer",
             }}
           >

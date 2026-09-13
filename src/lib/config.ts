@@ -86,10 +86,8 @@ const schema = z.object({
   GOOGLE_MAPS_API_KEY: optional,
 
   // --- Team routing --------------------------------------------------------
-  /** Inbox that receives new BITSOL Marketing leads, quotes and meetings. */
+  /** Inbox that receives new leads, quotes, meetings and escalations. */
   SALES_NOTIFY_EMAIL: optional,
-  /** Inbox that receives new BITSOL Institute admission inquiries. */
-  ADMISSIONS_NOTIFY_EMAIL: optional,
 });
 
 const parsed = schema.safeParse(process.env);
@@ -202,7 +200,6 @@ export const config = {
 
   routing: {
     salesEmail: env.SALES_NOTIFY_EMAIL,
-    admissionsEmail: env.ADMISSIONS_NOTIFY_EMAIL,
   },
 } as const;
 

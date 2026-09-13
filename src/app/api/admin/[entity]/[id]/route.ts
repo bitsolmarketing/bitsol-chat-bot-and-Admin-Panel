@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import type { Department } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { isOwn } from "@/lib/admin/queries";
 import { logEvent } from "@/lib/notify";
 
 export const runtime = "nodejs";
@@ -19,17 +19,16 @@ export const dynamic = "force-dynamic";
  *
  *   • only the entities in `HANDLERS` are reachable,
  *   • each has its own Zod schema, so no arbitrary field can be written,
- *   • the record's department is checked against the session before the write,
- *     so Marketing staff cannot move an admission and vice versa,
+ *   • a record archived from the retired BITSOL Institute is refused, even by
+ *     id, so nothing hidden from the console can be edited through it,
  *   • every change is written to the audit log.
  * =============================================================================
  */
 
 interface Handler {
   schema: z.ZodTypeAny;
-  /** Department the record belongs to; `null` means read it from the row. */
-  fixedDepartment: Department | null;
-  load: (id: string) => Promise<{ department: Department } | null>;
+  /** The record's `department`, or null for tables that have no such column. */
+  load: (id: string) => Promise<{ department: string | null } | null>;
   update: (id: string, data: Record<string, unknown>) => Promise<unknown>;
   action: string;
 }
@@ -40,18 +39,6 @@ const leadSchema = z.object({
     .optional(),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
   estimatedValue: z.number().nonnegative().optional(),
-  lostReason: z.string().max(500).optional(),
-  ownerId: z.string().cuid().nullish(),
-});
-
-const admissionSchema = z.object({
-  stage: z
-    .enum([
-      "INQUIRY", "CONTACTED", "COUNSELLED", "APPLIED",
-      "FEE_PENDING", "ENROLLED", "DROPPED", "LOST",
-    ])
-    .optional(),
-  priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
   lostReason: z.string().max(500).optional(),
   ownerId: z.string().cuid().nullish(),
 });
@@ -80,27 +67,15 @@ const knowledgeSchema = z.object({
 const HANDLERS: Record<string, Handler> = {
   leads: {
     schema: leadSchema,
-    fixedDepartment: "MARKETING",
     load: async (id) =>
       (await prisma.marketingLead.findUnique({ where: { id }, select: { id: true } }))
-        ? { department: "MARKETING" }
+        ? { department: null }
         : null,
     update: (id, data) => prisma.marketingLead.update({ where: { id }, data }),
     action: "lead.updated",
   },
-  admissions: {
-    schema: admissionSchema,
-    fixedDepartment: "INSTITUTE",
-    load: async (id) =>
-      (await prisma.admission.findUnique({ where: { id }, select: { id: true } }))
-        ? { department: "INSTITUTE" }
-        : null,
-    update: (id, data) => prisma.admission.update({ where: { id }, data }),
-    action: "admission.updated",
-  },
   tickets: {
     schema: ticketSchema,
-    fixedDepartment: null,
     load: (id) =>
       prisma.ticket.findUnique({ where: { id }, select: { department: true } }),
     update: (id, data) =>
@@ -115,7 +90,6 @@ const HANDLERS: Record<string, Handler> = {
   },
   meetings: {
     schema: meetingSchema,
-    fixedDepartment: null,
     load: (id) =>
       prisma.meeting.findUnique({ where: { id }, select: { department: true } }),
     update: (id, data) =>
@@ -128,29 +102,14 @@ const HANDLERS: Record<string, Handler> = {
       }),
     action: "meeting.updated",
   },
-  "knowledge-marketing": {
+  knowledge: {
     schema: knowledgeSchema,
-    fixedDepartment: "MARKETING",
     load: async (id) =>
       (await prisma.marketingKnowledge.findUnique({ where: { id }, select: { id: true } }))
-        ? { department: "MARKETING" }
+        ? { department: null }
         : null,
     update: (id, data) =>
       prisma.marketingKnowledge.update({
-        where: { id },
-        data: { ...data, indexedAt: new Date() },
-      }),
-    action: "knowledge.updated",
-  },
-  "knowledge-institute": {
-    schema: knowledgeSchema,
-    fixedDepartment: "INSTITUTE",
-    load: async (id) =>
-      (await prisma.instituteKnowledge.findUnique({ where: { id }, select: { id: true } }))
-        ? { department: "INSTITUTE" }
-        : null,
-    update: (id, data) =>
-      prisma.instituteKnowledge.update({
         where: { id },
         data: { ...data, indexedAt: new Date() },
       }),
@@ -184,21 +143,14 @@ export async function PATCH(
 
   try {
     const record = await handler.load(id);
-    if (!record) {
+    if (!record || !isOwn(record.department)) {
       return Response.json({ error: "Record not found." }, { status: 404 });
-    }
-    if (!canAccessDepartment(session, record.department)) {
-      return Response.json(
-        { error: "This record belongs to the other business." },
-        { status: 403 }
-      );
     }
 
     await handler.update(id, data);
 
     await logEvent({
       action: handler.action,
-      department: record.department,
       entity,
       entityId: id,
       message: `${session.name} updated ${entity} ${id}.`,

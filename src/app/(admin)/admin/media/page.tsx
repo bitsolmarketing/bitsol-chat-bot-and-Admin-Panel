@@ -1,10 +1,9 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatusBadge,
 } from "@/components/admin/ui";
@@ -26,12 +25,12 @@ function formatBytes(bytes: number | null): string {
 }
 
 export default async function MediaPage() {
-  const session = await requireAdmin("/admin/media");
+  await requireAdmin("/admin/media");
 
   const { data, error } = await safeQuery(
     () =>
       prisma.mediaAsset.findMany({
-        where: scope(session),
+        where: OWN,
         orderBy: { createdAt: "desc" },
         take: 200,
       }),
@@ -41,8 +40,9 @@ export default async function MediaPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Content"
         title="Media & Documents"
-        description="Prospectuses, course outlines, fee sheets, brochures and images. Anything marked as a download is offered to visitors by the assistant."
+        description="Company profiles, service brochures, case-study decks and images. Anything marked as a download is offered to visitors by the assistant."
       />
 
       {error && <DbNotice error={error} />}
@@ -65,7 +65,6 @@ export default async function MediaPage() {
               </div>
             ),
           },
-          { header: "Business", cell: (row) => <DepartmentTag department={row.department} /> },
           { header: "Type", cell: (row) => <StatusBadge value={row.kind} /> },
           {
             header: "File",

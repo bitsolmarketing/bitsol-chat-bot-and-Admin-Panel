@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
   StatusBadge,
@@ -16,19 +15,19 @@ import { formatDateTime, truncate } from "@/lib/utils";
 export const metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
-  const session = await requireAdmin("/admin/notifications");
+  await requireAdmin("/admin/notifications");
 
   const { data, error } = await safeQuery(
     async () => {
       const [notifications, queued, sent, failed] = await Promise.all([
         prisma.notification.findMany({
-          where: scope(session),
+          where: OWN_OR_GLOBAL,
           orderBy: { createdAt: "desc" },
           take: 100,
         }),
-        prisma.notification.count({ where: { ...scope(session), status: "QUEUED" } }),
-        prisma.notification.count({ where: { ...scope(session), status: "SENT" } }),
-        prisma.notification.count({ where: { ...scope(session), status: "FAILED" } }),
+        prisma.notification.count({ where: { ...OWN_OR_GLOBAL, status: "QUEUED" } }),
+        prisma.notification.count({ where: { ...OWN_OR_GLOBAL, status: "SENT" } }),
+        prisma.notification.count({ where: { ...OWN_OR_GLOBAL, status: "FAILED" } }),
       ]);
       return { notifications, queued, sent, failed };
     },
@@ -38,8 +37,9 @@ export default async function NotificationsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Support & Messaging"
         title="Notifications"
-        description="The outbound queue. New leads, admission inquiries, meetings and escalations land here for the owning team."
+        description="The outbound queue. New leads, meetings and escalations land here for the team."
       />
 
       {error && <DbNotice error={error} />}
@@ -55,15 +55,6 @@ export default async function NotificationsPage() {
         rowKey={(row) => row.id}
         empty="Nothing in the queue."
         columns={[
-          {
-            header: "Business",
-            cell: (row) =>
-              row.department ? (
-                <DepartmentTag department={row.department} />
-              ) : (
-                <span className="text-xs text-muted-foreground">System</span>
-              ),
-          },
           { header: "Channel", cell: (row) => <StatusBadge value={row.channel} /> },
           {
             header: "To",

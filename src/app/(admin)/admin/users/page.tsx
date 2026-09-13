@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   Callout,
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatusBadge,
 } from "@/components/admin/ui";
@@ -14,14 +13,12 @@ import { formatDateTime, humanise } from "@/lib/utils";
 export const metadata = { title: "Users" };
 
 export default async function UsersPage() {
-  const session = await requireAdmin("/admin/users");
-  const unrestricted = session.role === "SUPER_ADMIN" || session.role === "ADMIN";
+  await requireAdmin("/admin/users");
 
   const { data, error } = await safeQuery(
     () =>
       prisma.user.findMany({
-        // Department-scoped admins only manage their own business's staff.
-        where: unrestricted ? undefined : { department: session.department ?? undefined },
+        where: OWN_OR_GLOBAL,
         orderBy: [{ role: "desc" }, { name: "asc" }],
         take: 200,
         include: { rbac: { select: { name: true } } },
@@ -32,16 +29,16 @@ export default async function UsersPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Administration"
         title="Users"
-        description="Staff accounts, their access tier and which business they're scoped to."
+        description="Staff accounts and their access tier."
       />
 
       {error && <DbNotice error={error} />}
 
-      <Callout title="Department scoping is enforced everywhere">
-        A user assigned to BITSOL Marketing cannot read or edit BITSOL Institute records, and vice
-        versa — the restriction is applied in the data layer, not just in the navigation. Leave
-        the department blank only for staff who genuinely need both.
+      <Callout title="Former BITSOL Institute accounts are not listed">
+        Staff accounts that belonged to BITSOL Institute are kept in the database but hidden here,
+        and they can no longer sign in to this console.
       </Callout>
 
       <div className="mt-6">
@@ -70,15 +67,6 @@ export default async function UsersPage() {
                   {row.rbac?.name ?? "No role assigned"}
                 </span>
               ),
-            },
-            {
-              header: "Business",
-              cell: (row) =>
-                row.department ? (
-                  <DepartmentTag department={row.department} />
-                ) : (
-                  <span className="text-xs text-muted-foreground">Both</span>
-                ),
             },
             {
               header: "Contact",

@@ -86,8 +86,8 @@ export function ChatInput({
   }
 
   return (
-    <div className="glass rounded-2xl border p-2 shadow-soft">
-      <div className="flex items-end gap-2">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-1.5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.8)] transition focus-within:border-brand-cyan/45 focus-within:bg-white/[0.06] focus-within:shadow-[0_0_0_4px_rgba(0,217,255,0.08)]">
+      <div className="flex items-end gap-1">
         <input
           ref={fileRef}
           type="file"
@@ -99,7 +99,7 @@ export function ChatInput({
           type="button"
           variant="ghost"
           size="icon"
-          className="shrink-0"
+          className="shrink-0 text-white/50 hover:bg-white/5 hover:text-white"
           aria-label="Attach a file, image or PDF"
           onClick={() => fileRef.current?.click()}
           disabled={disabled}
@@ -119,7 +119,7 @@ export function ChatInput({
           }}
           rows={1}
           placeholder={placeholder}
-          className="max-h-40 flex-1 resize-none bg-transparent px-1 py-2.5 text-sm outline-none placeholder:text-muted-foreground"
+          className="max-h-40 flex-1 resize-none bg-transparent px-1 py-3 text-[14px] text-white outline-none placeholder:text-white/35"
           disabled={disabled}
         />
 
@@ -127,7 +127,7 @@ export function ChatInput({
           type="button"
           variant={listening ? "destructive" : "ghost"}
           size="icon"
-          className="shrink-0"
+          className={cn("shrink-0", !listening && "text-white/50 hover:bg-white/5 hover:text-white")}
           aria-label={listening ? "Stop voice input" : "Start voice input"}
           onClick={toggleVoice}
           disabled={disabled}
@@ -149,8 +149,9 @@ export function ChatInput({
         ) : (
           <Button
             type="button"
+            variant="brand"
             size="icon"
-            className={cn("shrink-0", !value.trim() && "opacity-60")}
+            className={cn("shrink-0 rounded-xl", !value.trim() && "opacity-50 shadow-none")}
             aria-label="Send message"
             onClick={submit}
             disabled={disabled || !value.trim()}

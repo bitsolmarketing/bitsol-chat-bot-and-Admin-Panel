@@ -2,29 +2,23 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { DEPARTMENT } from "@/lib/brands";
+import { isOwn } from "@/lib/admin/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * CRM timeline entries — notes, follow-ups, reminders, calls and messages
- * against a lead, admission, customer, student, ticket or project.
+ * against a lead, customer, ticket or project.
  *
  * Follow-ups and reminders carry a `dueAt` and appear on the Follow-ups board
  * until they're marked complete.
  */
 const schema = z.object({
-  entityType: z.enum([
-    "MarketingLead",
-    "Admission",
-    "Customer",
-    "Student",
-    "Ticket",
-    "Project",
-  ]),
+  entityType: z.enum(["MarketingLead", "Customer", "Ticket", "Project"]),
   entityId: z.string().min(1).max(64),
-  department: z.enum(["MARKETING", "INSTITUTE"]),
   type: z.enum([
     "NOTE", "FOLLOW_UP", "REMINDER", "CALL", "EMAIL", "WHATSAPP", "MEETING",
   ]),
@@ -44,13 +38,6 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data;
 
-  if (!canAccessDepartment(session, data.department)) {
-    return Response.json(
-      { error: "This record belongs to the other business." },
-      { status: 403 }
-    );
-  }
-
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
   if (dueAt && Number.isNaN(dueAt.getTime())) {
     return Response.json({ error: "Invalid due date." }, { status: 400 });
@@ -59,7 +46,7 @@ export async function POST(req: NextRequest) {
   try {
     const activity = await prisma.crmActivity.create({
       data: {
-        department: data.department,
+        department: DEPARTMENT,
         type: data.type,
         entityType: data.entityType,
         entityId: data.entityId,
@@ -95,9 +82,8 @@ export async function PATCH(req: NextRequest) {
       where: { id: parsed.data.id },
       select: { department: true },
     });
-    if (!activity) return Response.json({ error: "Not found." }, { status: 404 });
-    if (!canAccessDepartment(session, activity.department)) {
-      return Response.json({ error: "Not authorised." }, { status: 403 });
+    if (!activity || !isOwn(activity.department)) {
+      return Response.json({ error: "Not found." }, { status: 404 });
     }
 
     await prisma.crmActivity.update({

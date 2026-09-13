@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { BRANDS, type Department } from "./brands";
+import { BRAND } from "./brands";
 
 /** Merge Tailwind class names with conflict resolution (shadcn/ui convention). */
 export function cn(...inputs: ClassValue[]) {
@@ -22,33 +22,20 @@ export function shortId(length = 8): string {
 }
 
 /** The kinds of records that carry a customer-facing reference number. */
-export type ReferenceKind =
-  | "LEAD"
-  | "ADM"
-  | "TKT"
-  | "QTE"
-  | "MTG"
-  | "ENR"
-  | "CONV"
-  | "BCAST";
+export type ReferenceKind = "LEAD" | "TKT" | "QTE" | "MTG" | "CONV" | "BCAST";
 
 /**
- * Build a department-scoped reference, e.g. `BM-LEAD-7F3K2Q9A` (Marketing lead)
- * or `BI-ADM-4X8T2M6C` (Institute admission inquiry). The department prefix
- * makes it immediately obvious which business a reference belongs to — useful
- * on the CRM board, in WhatsApp replies and in support calls.
+ * Build a customer-facing reference, e.g. `BM-LEAD-7F3K2Q9A`. The kind in the
+ * middle says what the number points at — useful on the CRM board, in WhatsApp
+ * replies and when a customer reads it out on a support call.
  */
-export function generateReference(
-  kind: ReferenceKind,
-  department: Department,
-  length = 8
-): string {
-  return `${BRANDS[department].referencePrefix}-${kind}-${shortId(length)}`;
+export function generateReference(kind: ReferenceKind, length = 8): string {
+  return `${BRAND.referencePrefix}-${kind}-${shortId(length)}`;
 }
 
-/** Conversation reference used before a department has been chosen. */
+/** Reference for a chat thread, issued by the browser on its first message. */
 export function generateConversationReference(): string {
-  return `BX-CONV-${shortId(10)}`;
+  return generateReference("CONV", 10);
 }
 
 /** Very light script check: true if the text contains Urdu/Punjabi (Arabic) script. */

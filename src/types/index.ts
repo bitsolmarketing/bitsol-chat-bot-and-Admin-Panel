@@ -1,9 +1,7 @@
 /** Shared domain types used by both client and server code. */
 
-import type { Department } from "@/lib/brands";
 import type { Language } from "@/lib/i18n";
 
-export type { Department, DepartmentSlug } from "@/lib/brands";
 export type { Language } from "@/lib/i18n";
 
 // ------------------------------------------------------------------- Chat ---
@@ -14,8 +12,6 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
-  /** Which business this turn belongs to (null before the user has chosen). */
-  department?: Department | null;
   createdAt?: string;
 }
 
@@ -31,29 +27,21 @@ export interface QuickReply {
  * user says "I want a quote", the model finishes its sentence and the client
  * opens the matching form instead of collecting nine fields conversationally.
  */
-export type ChatActionKind =
-  | "LEAD_FORM"
-  | "MEETING_FORM"
-  | "QUOTE_FORM"
-  | "SUPPORT_FORM"
-  | "ADMISSION_FORM"
-  | "CAREER_FORM"
-  | "CHOOSE_DEPARTMENT";
+export type ChatActionKind = "LEAD_FORM" | "MEETING_FORM" | "QUOTE_FORM" | "SUPPORT_FORM";
 
 export interface ChatAction {
   kind: ChatActionKind;
-  /** Pre-selected service or course slug, when the user named one. */
+  /** Pre-selected service slug, when the user named one. */
   subject?: string;
 }
 
 /** SSE event payloads streamed from /api/chat to the browser. */
 export type ChatStreamEvent =
-  | { type: "meta"; department: Department | null; language: Language }
+  | { type: "meta"; language: Language }
   | { type: "chunk"; text: string }
   | {
       type: "done";
       ticketId?: string;
-      department: Department | null;
       suggestions?: string[];
       action?: ChatAction;
     }
@@ -61,18 +49,11 @@ export type ChatStreamEvent =
 
 // -------------------------------------------------------- Knowledge base ----
 
-export type KnowledgeKind =
-  | "FAQ"
-  | "ARTICLE"
-  | "SERVICE"
-  | "COURSE"
-  | "POLICY"
-  | "DOCUMENT";
+export type KnowledgeKind = "FAQ" | "ARTICLE" | "SERVICE" | "POLICY" | "DOCUMENT";
 
-/** One entry in a department knowledge base. */
+/** One entry in the BITSOL Marketing knowledge base. */
 export interface KnowledgeEntry {
   id: string;
-  department: Department;
   kind: KnowledgeKind;
   category: string;
   question: string;
@@ -113,32 +94,7 @@ export interface ServiceItem {
   keywords: string[];
 }
 
-export interface CourseInstalment {
-  label: string;
-  detail: string;
-}
-
-/** A BITSOL Institute course, rendered in the menu and answered from the KB. */
-export interface CourseItem {
-  slug: string;
-  name: string;
-  group: string;
-  tagline: string;
-  overview: string;
-  curriculum: string[];
-  duration: string;
-  /** Placeholder fee — confirmed by the admissions office. */
-  fee: PricePlaceholder;
-  instalments: CourseInstalment[];
-  trainer: string;
-  careers: string[];
-  projects: string[];
-  certification: string;
-  eligibility: string;
-  keywords: string[];
-}
-
-/** A menu entry shown in the department menu panel. */
+/** A menu entry shown in the chat menu panel. */
 export interface MenuEntry {
   id: string;
   label: string;
@@ -165,22 +121,7 @@ export interface LeadSubmission {
   conversationRef?: string;
 }
 
-export interface AdmissionSubmission {
-  studentName: string;
-  fatherName?: string;
-  phone: string;
-  whatsapp?: string;
-  email?: string;
-  qualification?: string;
-  city?: string;
-  course: string;
-  preferredBatch?: string;
-  notes?: string;
-  conversationRef?: string;
-}
-
 export interface MeetingSubmission {
-  department: Department;
   name: string;
   phone: string;
   email?: string;
@@ -193,7 +134,6 @@ export interface MeetingSubmission {
 }
 
 export interface TicketSubmission {
-  department: Department;
   category: "TECHNICAL" | "BILLING" | "SALES" | "COMPLAINT" | "GENERAL";
   name: string;
   phone?: string;

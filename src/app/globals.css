@@ -4,141 +4,99 @@
 
 /*
  * =============================================================================
- *  BITSOL AI Assistant — theme
+ *  BITSOL Marketing — design system
  * =============================================================================
  *
- *  Three palettes, all HSL CSS variables so shadcn/ui primitives work unchanged:
+ *  The palette and type are bitsolmarketing.com's own: midnight #050816, slate
+ *  #0F172A, cyan #00D9FF, violet #7C3AED, blue #2563EB, set in Montserrat — so
+ *  the assistant reads as part of the same house as the main site.
  *
- *    :root                        BITSOL umbrella (indigo/violet) — used on the
- *                                 landing page, splash and welcome screen,
- *                                 before a business has been chosen.
- *    [data-department="MARKETING"] Electric blue — BITSOL Marketing.
- *    [data-department="INSTITUTE"] Academy emerald — BITSOL Institute.
+ *  Two token sets, both HSL variables so shadcn/ui primitives work unchanged:
  *
- *  Setting `data-department` on any wrapper re-themes everything inside it, so
- *  the chat window changes brand the moment the router decides — no component
- *  needs to know which business it is rendering for.
+ *    :root   Light. The admin workspace, where dense tables need paper-white
+ *            contrast.
+ *    .dark   Midnight. Every public surface (landing, chat, sign-in) and the
+ *            admin sidebar. Applied per subtree with `className="dark"`, so a
+ *            page chooses its surface rather than following the OS setting.
  * =============================================================================
  */
 @layer base {
   :root {
-    /* Urdu/Punjabi-friendly system font stack — no external font fetch. */
-    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-      "Noto Naskh Arabic", "Jameel Noori Nastaleeq", "Nafees Web Naskh", sans-serif;
+    /* Montserrat for Latin; Naskh faces so Urdu and Punjabi still render well. */
+    --font-sans: "Montserrat Variable", Montserrat, ui-sans-serif, system-ui,
+      -apple-system, "Segoe UI", "Noto Naskh Arabic", "Jameel Noori Nastaleeq",
+      "Nafees Web Naskh", sans-serif;
 
-    --background: 228 40% 98%;
-    --foreground: 231 45% 13%;
+    --background: 216 33% 97%;
+    --foreground: 229 63% 5%;
 
     --card: 0 0% 100%;
-    --card-foreground: 231 45% 13%;
+    --card-foreground: 229 63% 5%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 231 45% 13%;
+    --popover-foreground: 229 63% 5%;
 
-    /* BITSOL indigo */
-    --primary: 231 62% 30%;
+    /* Brand blue #2563EB */
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 228 38% 96%;
-    --secondary-foreground: 231 45% 18%;
+    --secondary: 216 33% 94%;
+    --secondary-foreground: 222 47% 11%;
 
-    /* BITSOL violet */
-    --accent: 262 68% 56%;
+    /* Brand violet #7C3AED */
+    --accent: 262 83% 58%;
     --accent-foreground: 0 0% 100%;
 
-    --muted: 228 28% 94%;
-    --muted-foreground: 231 16% 44%;
+    --muted: 216 33% 94%;
+    --muted-foreground: 217 16% 40%;
 
-    --destructive: 0 72% 48%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 231 22% 88%;
-    --input: 231 22% 88%;
-    --ring: 231 62% 42%;
+    --border: 216 30% 89%;
+    --input: 216 30% 86%;
+    --ring: 221 83% 53%;
 
-    --radius: 0.9rem;
+    --radius: 0.875rem;
 
-    /* Hero/splash backdrop stops, overridden per department below. */
-    --brand-a: 231 62% 22%;
-    --brand-b: 262 68% 34%;
-  }
-
-  /* ---------------------------------------------- BITSOL Marketing (blue) -- */
-  [data-department="MARKETING"] {
-    --primary: 219 78% 34%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 199 89% 45%;
-    --accent-foreground: 0 0% 100%;
-    --ring: 219 78% 46%;
-    --secondary: 214 40% 96%;
-    --secondary-foreground: 217 45% 18%;
-    --muted: 214 30% 94%;
-    --border: 214 24% 88%;
-    --input: 214 24% 88%;
-    --brand-a: 219 78% 20%;
-    --brand-b: 199 89% 28%;
-  }
-
-  /* ---------------------------------------------- BITSOL Institute (green) - */
-  [data-department="INSTITUTE"] {
-    --primary: 168 74% 22%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 158 68% 40%;
-    --accent-foreground: 0 0% 100%;
-    --ring: 168 74% 34%;
-    --secondary: 160 32% 95%;
-    --secondary-foreground: 168 45% 16%;
-    --muted: 160 24% 93%;
-    --border: 160 20% 87%;
-    --input: 160 20% 87%;
-    --brand-a: 168 74% 14%;
-    --brand-b: 158 68% 24%;
+    /* Fixed brand colours — identical on both surfaces. */
+    --brand-ink: 229 63% 5%;
+    --brand-slate: 222 47% 11%;
+    --brand-cyan: 189 100% 50%;
+    --brand-violet: 262 83% 58%;
+    --brand-blue: 221 83% 53%;
+    --brand-pink: 314 62% 50%;
   }
 
   .dark {
-    --background: 231 42% 8%;
-    --foreground: 228 38% 96%;
+    --background: 229 63% 5%;
+    --foreground: 210 40% 98%;
 
-    --card: 231 38% 12%;
-    --card-foreground: 228 38% 96%;
+    --card: 228 48% 8%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 231 38% 12%;
-    --popover-foreground: 228 38% 96%;
+    --popover: 228 48% 9%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 231 88% 72%;
-    --primary-foreground: 231 45% 10%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 231 26% 18%;
-    --secondary-foreground: 228 38% 96%;
+    --secondary: 226 38% 13%;
+    --secondary-foreground: 210 40% 96%;
 
-    --accent: 262 78% 68%;
-    --accent-foreground: 231 45% 10%;
+    /* Brand cyan #00D9FF */
+    --accent: 189 100% 50%;
+    --accent-foreground: 229 63% 5%;
 
-    --muted: 231 26% 18%;
-    --muted-foreground: 231 16% 66%;
+    --muted: 226 38% 13%;
+    --muted-foreground: 215 20% 68%;
 
-    --destructive: 0 62% 52%;
+    --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 231 26% 22%;
-    --input: 231 26% 22%;
-    --ring: 231 88% 72%;
-  }
-
-  .dark [data-department="MARKETING"] {
-    --primary: 205 90% 66%;
-    --primary-foreground: 217 45% 10%;
-    --accent: 191 84% 54%;
-    --accent-foreground: 217 45% 10%;
-    --ring: 205 90% 66%;
-  }
-
-  .dark [data-department="INSTITUTE"] {
-    --primary: 158 66% 55%;
-    --primary-foreground: 168 45% 8%;
-    --accent: 152 62% 46%;
-    --accent-foreground: 0 0% 100%;
-    --ring: 158 66% 55%;
+    --border: 225 32% 17%;
+    --input: 225 30% 20%;
+    --ring: 189 100% 50%;
   }
 }
 
@@ -146,28 +104,110 @@
   * {
     @apply border-border;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  /* The dark subtree paints its own ground, so it never shows the light body. */
+  .dark {
+    color-scheme: dark;
+    @apply text-foreground;
+  }
+  ::selection {
+    background: hsl(var(--brand-cyan) / 0.28);
+  }
 }
 
 @layer components {
-  /* Frosted-glass surface used across cards, chat and headers. */
+  /* Frosted-glass surface used by headers, the composer and floating cards. */
   .glass {
-    @apply bg-white/70 dark:bg-white/[0.06] backdrop-blur-xl border border-white/40 dark:border-white/10;
+    @apply border border-white/50 bg-white/75 backdrop-blur-xl dark:border-white/[0.08] dark:bg-[hsl(228_48%_8%/0.62)];
+  }
+
+  /* The main site's glass card, verbatim. */
+  .glass-card {
+    background: rgba(15, 23, 42, 0.6);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
   }
 
   /*
-   * Brand backdrop. Picks up whichever --brand-* pair is in scope, so the same
-   * class renders indigo on the landing page, blue inside a Marketing chat and
-   * emerald inside an Institute chat.
+   * Midnight backdrop for hero panels, the chat stage, sign-in and splash:
+   * #050816 lit by a cyan glow top-left and a violet glow top-right.
    */
   .brand-gradient {
-    background:
-      radial-gradient(1200px 600px at 10% -10%, hsl(var(--brand-a) / 0.95), transparent 60%),
-      radial-gradient(1000px 500px at 100% 10%, hsl(var(--brand-b) / 0.7), transparent 55%),
-      linear-gradient(160deg, hsl(var(--brand-a)), hsl(var(--brand-b)));
+    background-color: hsl(var(--brand-ink));
+    background-image:
+      radial-gradient(900px 520px at 12% -12%, hsl(var(--brand-cyan) / 0.16), transparent 60%),
+      radial-gradient(900px 560px at 92% -6%, hsl(var(--brand-violet) / 0.26), transparent 62%),
+      radial-gradient(700px 500px at 50% 115%, hsl(var(--brand-blue) / 0.18), transparent 65%);
+  }
+
+  /* Hairline grid that fades out towards the edges — texture, not decoration. */
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(0 0% 100% / 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(0 0% 100% / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black 30%, transparent 75%);
+  }
+
+  /* Signature blue → violet, used on primary calls to action. */
+  .bg-brand {
+    background-image: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  }
+
+  /* The main site's gradient headline text. */
+  .text-gradient {
+    background-image: linear-gradient(to right, #2563eb, #7c3aed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .dark .text-gradient {
+    background-image: linear-gradient(to right, #00d9ff, #cf30aa);
+  }
+
+  .neo-glow {
+    box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+  }
+
+  /* Small uppercase label that sits above a section title. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground;
+  }
+  .eyebrow::before {
+    content: "";
+    @apply size-1.5 rounded-full bg-accent;
+    box-shadow: 0 0 12px hsl(var(--accent) / 0.8);
+  }
+
+  /* A 1px border that fades from cyan to violet — for cards that lead a section. */
+  .ring-gradient {
+    position: relative;
+    isolation: isolate;
+  }
+  .ring-gradient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, hsl(var(--brand-cyan) / 0.55), hsl(var(--brand-violet) / 0.15) 45%, hsl(var(--brand-violet) / 0.55));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
   }
 
   /* Right-to-left friendly text block for Urdu / Punjabi content. */
@@ -185,9 +225,20 @@
   height: 8px;
 }
 .scroll-slim::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.35);
+  background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 9999px;
 }
 .scroll-slim::-webkit-scrollbar-track {
   background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

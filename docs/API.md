@@ -5,8 +5,6 @@ _Designed & Developed by BITSOL MARKETING_
 Base URL: `${APP_URL}` (e.g. `http://localhost:3000`). All endpoints are
 Next.js Route Handlers running on the Node.js runtime.
 
-`department` is always one of `MARKETING` | `INSTITUTE`.
-
 ---
 
 ## POST `/api/chat`
@@ -17,11 +15,9 @@ Stream an assistant reply. The response is **Server-Sent Events**
 ### Request body
 ```json
 {
-  "conversationRef": "BX-CONV-AB12CD34EF",
-  "department": "INSTITUTE",
-  "requestedDepartment": null,
+  "conversationRef": "BM-CONV-AB12CD34EF",
   "messages": [
-    { "role": "user", "content": "SEO course ki fees kitni hai?" }
+    { "role": "user", "content": "SEO ka rate kya hai?" }
   ]
 }
 ```
@@ -30,31 +26,25 @@ Stream an assistant reply. The response is **Server-Sent Events**
 | --- | --- | --- |
 | `messages` | ✅ | 1–50 turns; each `content` 1–4000 chars |
 | `conversationRef` | | Groups turns into one conversation; generated if absent |
-| `department` | | The business already pinned to this conversation (sticky memory) |
-| `requestedDepartment` | | An explicit pick from the welcome menu or switcher — overrides inference |
 
 ### Response stream
 
 ```
-data: {"type":"meta","department":"INSTITUTE","language":"ur_roman"}
-data: {"type":"chunk","text":"SEO course 2 mahine ka hai, "}
-data: {"type":"chunk","text":"fees PKR 30,000 se shuru hoti hai…"}
-data: {"type":"done","department":"INSTITUTE","suggestions":["Instalment plan","Next batch"],"action":{"kind":"ADMISSION_FORM","subject":"seo"}}
+data: {"type":"meta","language":"ur_roman"}
+data: {"type":"chunk","text":"SEO monthly retainer par hota hai, "}
+data: {"type":"chunk","text":"indicative price PKR 60,000/month se shuru…"}
+data: {"type":"done","suggestions":["SEO pricing","SEO process","Request a quote"],"action":{"kind":"QUOTE_FORM","subject":"seo"}}
 ```
 
 | `type` | Fields | Meaning |
 | --- | --- | --- |
-| `meta` | `department`, `language` | Routing outcome, sent **before** generation so the UI can re-theme |
+| `meta` | `language` | Detected language, sent **before** generation so the UI can set text direction |
 | `chunk` | `text` | Incremental assistant text |
-| `done` | `department`, `ticketId?`, `suggestions?`, `action?` | Stream complete |
+| `done` | `ticketId?`, `suggestions?`, `action?` | Stream complete |
 | `error` | `message` | A recoverable error to show the user |
 
 `action.kind` is one of `LEAD_FORM`, `QUOTE_FORM`, `MEETING_FORM`,
-`SUPPORT_FORM`, `ADMISSION_FORM`, `CAREER_FORM`, `CHOOSE_DEPARTMENT`.
-`action.subject` pre-selects a service or course slug when the user named one.
-
-`department` is `null` while the assistant is still working out which business
-the visitor needs.
+`SUPPORT_FORM`. `action.subject` pre-selects a service slug when the user named one.
 
 ### Status codes
 `200` stream started · `400` invalid body · `429` rate limited (30 req / 60 s per IP)
@@ -67,7 +57,7 @@ curl -N http://localhost:3000/api/chat \
 
 ---
 
-## POST `/api/leads` — BITSOL Marketing lead capture
+## POST `/api/leads` — lead capture
 
 ```json
 {
@@ -80,12 +70,12 @@ curl -N http://localhost:3000/api/chat \
   "budget": "PKR 100,000 – 300,000",
   "timeline": "Within 1 month",
   "requirements": "WhatsApp bot that books orders and answers pricing.",
-  "conversationRef": "BX-CONV-AB12CD34EF"
+  "conversationRef": "BM-CONV-AB12CD34EF"
 }
 ```
 
 Required: `name`, `phone`, `requirements`. `service` is a slug from
-`/api/catalog?department=MARKETING`.
+`/api/catalog`.
 
 `201` → `{ "ok": true, "reference": "BM-LEAD-7F3K2Q9A", "message": "…" }`
 
@@ -94,38 +84,10 @@ notification and writes an audit entry.
 
 ---
 
-## POST `/api/admissions` — BITSOL Institute admission inquiry
+## POST `/api/meetings` — consultation booking
 
 ```json
 {
-  "studentName": "Ayesha Khan",
-  "fatherName": "Khalid Khan",
-  "phone": "03001234567",
-  "whatsapp": "03001234567",
-  "email": "ayesha@example.com",
-  "qualification": "Intermediate / FSc / FA",
-  "city": "Faisalabad",
-  "course": "digital-marketing-with-ai",
-  "preferredBatch": "Evening (6:00 – 8:00 PM)",
-  "notes": "Interested in a scholarship.",
-  "conversationRef": "BX-CONV-AB12CD34EF"
-}
-```
-
-Required: `studentName`, `phone`, `course`. `course` accepts a catalogue slug or
-free text — an unrecognised course name is still captured so no inquiry is lost.
-
-`201` → `{ "ok": true, "reference": "BI-ADM-4X8T2M6C", "message": "…" }`
-
-Creates the inquiry at stage `INQUIRY` and notifies the admissions team.
-
----
-
-## POST `/api/meetings` — consultation / counselling booking
-
-```json
-{
-  "department": "MARKETING",
   "name": "Ali Raza",
   "phone": "03001234567",
   "email": "ali@example.com",
@@ -134,7 +96,7 @@ Creates the inquiry at stage `INQUIRY` and notifies the admissions team.
   "preferredTime": "3:00 PM",
   "mode": "ZOOM",
   "topic": "AI automation for order handling",
-  "conversationRef": "BX-CONV-AB12CD34EF"
+  "conversationRef": "BM-CONV-AB12CD34EF"
 }
 ```
 
@@ -149,14 +111,13 @@ rejected with `400`.
 
 ```json
 {
-  "department": "MARKETING",
   "category": "TECHNICAL",
   "name": "Ali Raza",
   "phone": "03001234567",
   "email": "ali@example.com",
   "subject": "Chatbot not replying on WhatsApp",
   "description": "Since this morning the bot stopped answering.",
-  "conversationRef": "BX-CONV-AB12CD34EF"
+  "conversationRef": "BM-CONV-AB12CD34EF"
 }
 ```
 
@@ -170,28 +131,23 @@ Complaints are raised at `HIGH` priority automatically.
 ## GET `/api/catalog`
 
 ```
-GET /api/catalog?department=MARKETING            → all services
-GET /api/catalog?department=INSTITUTE            → all courses
-GET /api/catalog?department=INSTITUTE&slug=seo   → one course
+GET /api/catalog              → all services
+GET /api/catalog?slug=seo     → one service
 ```
 
-`department` is mandatory — there is no unscoped catalogue, so a Marketing
-client cannot enumerate Institute courses through this route.
-
-`200` → `{ "department", "count", "items": [...] }` or `{ "department", "item" }`
-· `400` missing/invalid department · `404` unknown slug
+`200` → `{ "count", "items": [...] }` or `{ "item" }` · `404` unknown slug
 
 ---
 
 ## GET `/api/search`
 
-Natural-language knowledge search, scoped to one department.
+Natural-language search over the knowledge base.
 
 ```
-GET /api/search?department=INSTITUTE&q=fees%20kitni%20hain&limit=10
+GET /api/search?q=whatsapp%20automation%20price&limit=10
 ```
 
-`200` → `{ "department", "query", "count", "results": [{ id, category, kind, question, answer }] }`
+`200` → `{ "query", "count", "results": [{ id, category, kind, question, answer }] }`
 
 ---
 
@@ -200,23 +156,23 @@ GET /api/search?department=INSTITUTE&q=fees%20kitni%20hain&limit=10
 | Endpoint | Body | Result |
 | --- | --- | --- |
 | `POST /api/auth/register` | `{ name, email, password, phone? }` | `200` + `Set-Cookie: bitsol_session` · `409` email taken |
-| `POST /api/auth/login` | `{ email, password }` | `200` + cookie · `401` invalid (generic message) |
+| `POST /api/auth/login` | `{ email, password }` | `200` + cookie · `401` invalid (generic message) · `403` a former BITSOL Institute account |
 | `POST /api/auth/logout` | — | `200`, clears the cookie |
 
-The user object includes `role` and `department`, which the client uses to route
+The user object includes `role`, which the client uses to route
 staff to `/admin` and everyone else to `/chat`.
 
 ---
 
 ## Admin (authenticated)
 
-All admin endpoints require a session with role `AGENT`, `INSTRUCTOR`, `ADMIN`
-or `SUPER_ADMIN`, and reject records belonging to another business with `403`.
+All admin endpoints require a session with role `AGENT`, `ADMIN` or
+`SUPER_ADMIN`. Records archived from the retired BITSOL Institute are answered
+with `404`, even when addressed by id.
 
 ### PATCH `/api/admin/{entity}/{id}`
 
-`entity` ∈ `leads` | `admissions` | `tickets` | `meetings` |
-`knowledge-marketing` | `knowledge-institute`
+`entity` ∈ `leads` | `tickets` | `meetings` | `knowledge`
 
 Each entity has its own allow-list schema — no arbitrary field can be written.
 
@@ -229,12 +185,11 @@ curl -X PATCH http://localhost:3000/api/admin/leads/clx123 \
 | Entity | Writable fields |
 | --- | --- |
 | `leads` | `stage`, `priority`, `estimatedValue`, `lostReason`, `ownerId` |
-| `admissions` | `stage`, `priority`, `lostReason`, `ownerId` |
 | `tickets` | `status`, `priority`, `resolution`, `assigneeId` |
 | `meetings` | `status`, `meetingLink`, `notes` |
-| `knowledge-*` | `state` |
+| `knowledge` | `state` |
 
-`200` → `{ "ok": true }` · `401` no session · `403` wrong business · `404` unknown entity/record
+`200` → `{ "ok": true }` · `401` no session · `404` unknown entity/record
 
 ### POST `/api/admin/activities`
 
@@ -244,7 +199,6 @@ Adds a note, follow-up or reminder to a CRM record's timeline.
 {
   "entityType": "MarketingLead",
   "entityId": "clx123",
-  "department": "MARKETING",
   "type": "FOLLOW_UP",
   "body": "Called — wants a revised quote for the WhatsApp module.",
   "dueAt": "2026-08-05T10:00:00+05:00"
@@ -297,7 +251,7 @@ requests are rejected with `401` and logged as `whatsapp.webhook.rejected`.
           "from": "923001234567",
           "timestamp": "1785000000",
           "type": "text",
-          "text": { "body": "mujhe SEO course ki fees chahiye" }
+          "text": { "body": "mujhe apne business ke liye chatbot chahiye" }
         }]
       }
     }]
@@ -307,7 +261,7 @@ requests are rejected with `401` and logged as `whatsapp.webhook.rejected`.
 
 Handled message types: `text`, `interactive` (button and list replies),
 `button`, `image` / `document` / `video` / `audio` / `sticker` (acknowledged,
-caption read), `location`. Anything else returns the menu.
+caption read), `location`. Anything else returns the welcome message.
 
 **Always responds `200`** once the signature checks out, including when
 processing fails — Meta redelivers on any other status, and a redelivery of an
@@ -321,12 +275,11 @@ stops before the assistant is invoked.
 | ------------------------- | ------------------------------------------------------- |
 | Any message               | `Conversation` (`channel = WHATSAPP`) + `Message` rows   |
 | Completed quote capture   | `MarketingLead`, `source = WHATSAPP`, stage `NEW`        |
-| Completed admission capture | `Admission`, `source = WHATSAPP`, stage `INQUIRY`      |
 | "Talk to a human"         | `Ticket` (`OPEN`) + conversation marked `handedOff`      |
-| Every one of the above    | `Notification` for the owning team + `SystemLog` entry   |
+| Every one of the above    | `Notification` for the sales team + `SystemLog` entry    |
 
-All of them appear in the admin console under CRM ▸ Leads / Admission Inquiries
-(filterable by source), Live Conversations, and Messaging ▸ WhatsApp Inbox.
+All of them appear in the admin console under Clients ▸ Leads (filterable by
+source), Live Conversations, and Support & Messaging ▸ WhatsApp Inbox.
 
 ---
 

@@ -1,31 +1,24 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
-import {
-  DbNotice,
-  DepartmentTag,
-  EmptyState,
-  PageHeader,
-  StatusBadge,
-} from "@/components/admin/ui";
+import { OWN, safeQuery } from "@/lib/admin/queries";
+import { DbNotice, EmptyState, PageHeader, StatusBadge } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 import { Star } from "lucide-react";
 
 export const metadata = { title: "Portfolio" };
 
 export default async function PortfolioPage() {
-  const session = await requireAdmin("/admin/catalogue/portfolio");
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/catalogue/portfolio");
 
   const { data, error } = await safeQuery(
     async () => {
       const [items, reviews] = await Promise.all([
         prisma.portfolioItem.findMany({
-          orderBy: [{ department: "asc" }, { sortOrder: "asc" }],
+          where: OWN,
+          orderBy: { sortOrder: "asc" },
           include: { service: { select: { name: true } } },
         }),
-        prisma.review.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),
+        prisma.review.findMany({ where: OWN, orderBy: { createdAt: "desc" }, take: 20 }),
       ]);
       return { items, reviews };
     },
@@ -35,8 +28,8 @@ export default async function PortfolioPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Practice"
         title="Portfolio & reviews"
-        department="MARKETING"
         description="Case studies and client testimonials the assistant references when a prospect asks for proof."
       />
 
@@ -46,7 +39,7 @@ export default async function PortfolioPage() {
       {data.items.length ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.items.map((item) => (
-            <Card key={item.id} data-department={item.department} className="p-4">
+            <Card key={item.id} className="p-5">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <h3 className="text-sm font-semibold">{item.title}</h3>
                 <StatusBadge value={item.isPublished ? "PUBLISHED" : "DRAFT"} />
@@ -84,14 +77,11 @@ export default async function PortfolioPage() {
       {data.reviews.length ? (
         <div className="grid gap-3 md:grid-cols-2">
           {data.reviews.map((review) => (
-            <Card key={review.id} data-department={review.department} className="p-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1 text-accent">
-                  {Array.from({ length: review.rating }).map((_, i) => (
-                    <Star key={i} className="size-3.5 fill-current" />
-                  ))}
-                </div>
-                <DepartmentTag department={review.department} />
+            <Card key={review.id} className="p-5">
+              <div className="mb-2 flex items-center gap-1 text-amber-500">
+                {Array.from({ length: review.rating }).map((_, i) => (
+                  <Star key={i} className="size-3.5 fill-current" />
+                ))}
               </div>
               <p className="text-sm leading-relaxed">“{review.body}”</p>
               <p className="mt-2 text-xs text-muted-foreground">

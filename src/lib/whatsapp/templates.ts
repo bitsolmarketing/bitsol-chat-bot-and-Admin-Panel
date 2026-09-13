@@ -266,7 +266,7 @@ export function flattenComponents(components: MetaComponent[] | undefined): Flat
  * Variable labels for a template.
  *
  * Meta stores no names for parameters — only positions and an example value.
- * A row that already has hand-written labels keeps them, because "courseName"
+ * A row that already has hand-written labels keeps them, because "serviceName"
  * in the composer is worth more than "Variable 2"; anything beyond what the
  * local row names falls back to a positional label.
  */
@@ -368,8 +368,9 @@ export async function syncTemplates(): Promise<SyncOutcome> {
           // for a template nobody has given one to.
           key: `${metaName}:${languageCode}`,
           name: humanTemplateName(metaName),
-          // Left unassigned on purpose — a synced template belongs to whichever
-          // business claims it, and guessing wrong hides it from the other one.
+          // Left unassigned: the WhatsApp Business Account may still hold
+          // templates written for BITSOL Institute, and stamping them as
+          // Marketing's here would make that claim on a guess.
           department: null,
         },
       });

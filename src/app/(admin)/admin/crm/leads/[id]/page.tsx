@@ -7,7 +7,7 @@ import { StatusSelect } from "@/components/admin/StatusSelect";
 import { ActivityComposer } from "@/components/admin/ActivityComposer";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import { findService } from "@/data/marketing/services";
 import { formatDateTime, formatPkr, humanise } from "@/lib/utils";
 
@@ -23,8 +23,7 @@ export default async function LeadDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireAdmin();
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin();
 
   const { id } = await params;
 
@@ -66,8 +65,8 @@ export default async function LeadDetailPage({
       </Link>
 
       <PageHeader
+        eyebrow="Lead"
         title={lead.name}
-        department="MARKETING"
         description={`Lead ${lead.reference} · captured ${formatDateTime(lead.createdAt)} from ${humanise(lead.source)}`}
         actions={
           <div className="flex items-center gap-2">
@@ -92,11 +91,7 @@ export default async function LeadDetailPage({
 
           <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Activity & follow-ups</h2>
-            <ActivityComposer
-              entityType="MarketingLead"
-              entityId={lead.id}
-              department="MARKETING"
-            />
+            <ActivityComposer entityType="MarketingLead" entityId={lead.id} />
 
             {data.activities.length ? (
               <ul className="mt-4 space-y-3">

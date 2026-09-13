@@ -1,6 +1,7 @@
-import type { Department, Prisma, WhatsappContact } from "@prisma/client";
+import type { Prisma, WhatsappContact } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/config";
+import { DEPARTMENT } from "@/lib/brands";
 import { sendTemplate, type TemplateHeaderMedia } from "./client";
 import { countPlaceholders, renderTemplate } from "./templates";
 
@@ -62,12 +63,10 @@ export interface AudienceFilter {
   kind?: "segment" | "list";
   /** For `list`: the numbers to message, already normalised to Meta's wa_id. */
   waIds?: string[];
-  /** Contacts routed to this business. */
-  department: Department;
   /**
-   * Also include contacts who have messaged but never been routed to either
-   * business. They are legitimate recipients — they just never got as far as
-   * the department menu.
+   * Also include contacts from before BITSOL Institute was retired who never
+   * picked a business in the old welcome menu. They are legitimate recipients,
+   * but they never actually asked about BITSOL Marketing, so it is opt-in.
    */
   includeUnrouted?: boolean;
   /**
@@ -96,17 +95,18 @@ export function audienceWhere(filter: AudienceFilter): Prisma.WhatsappContactWhe
 
   // An uploaded list is already the audience. It is still filtered by opt-out
   // and block above — the upload says who was *asked* for, not who may be
-  // messaged — but department and activity do not apply: the person chose
-  // these numbers explicitly.
+  // messaged — but business and activity do not apply: the person chose these
+  // numbers explicitly.
   if (filter.kind === "list") {
     where.waId = { in: filter.waIds ?? [] };
     return where;
   }
 
+  // Archived Institute contacts are never part of a segment.
   if (filter.includeUnrouted) {
-    where.OR = [{ department: filter.department }, { department: null }];
+    where.OR = [{ department: DEPARTMENT }, { department: null }];
   } else {
-    where.department = filter.department;
+    where.department = DEPARTMENT;
   }
 
   if (filter.activeWithinDays && filter.activeWithinDays > 0) {
@@ -149,16 +149,14 @@ export async function resolveAudience(filter: AudienceFilter): Promise<WhatsappC
  * one query: numbers this business has never seen become contacts, and numbers
  * it already knows are left completely alone. That second half matters —
  * an existing contact's WhatsApp profile name is better data than a name typed
- * into a spreadsheet, their department was set by an actual conversation, and
- * an upload must never quietly clear someone's opt-out.
+ * into a spreadsheet, and an upload must never quietly clear someone's opt-out.
  *
  * New contacts get `lastInboundAt` of null, which is the truth: they have
  * never messaged this business. The inbox reads that as "no messages yet"
  * rather than pretending a conversation happened.
  */
 export async function importContacts(
-  entries: Array<{ waId: string; phone: string; name?: string }>,
-  department: Department
+  entries: Array<{ waId: string; phone: string; name?: string }>
 ): Promise<string[]> {
   if (!entries.length) return [];
 
@@ -167,7 +165,7 @@ export async function importContacts(
       waId: entry.waId,
       phone: entry.phone,
       profileName: entry.name ?? null,
-      department,
+      department: DEPARTMENT,
     })),
     skipDuplicates: true,
   });
@@ -332,7 +330,6 @@ export async function prepareBroadcast(broadcastId: string): Promise<PrepareOutc
   const contacts = await resolveAudience({
     kind: filter.kind ?? "segment",
     waIds: filter.waIds ?? [],
-    department: broadcast.department,
     includeUnrouted: filter.includeUnrouted ?? false,
     activeWithinDays: filter.activeWithinDays ?? null,
     limit: filter.limit ?? null,

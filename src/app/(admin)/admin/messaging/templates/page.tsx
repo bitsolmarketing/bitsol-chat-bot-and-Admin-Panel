@@ -1,10 +1,9 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   Callout,
   DbNotice,
-  DepartmentTag,
   EmptyState,
   PageHeader,
   StatCard,
@@ -27,16 +26,12 @@ export const metadata = { title: "WhatsApp Templates" };
  * as approved that Meta rejected an hour ago would send nothing but errors.
  */
 export default async function TemplatesPage() {
-  const session = await requireAdmin("/admin/messaging/templates");
-  const department = sessionDepartment(session);
+  await requireAdmin("/admin/messaging/templates");
 
   const { data, error } = await safeQuery(
     async () => {
-      // Unassigned templates belong to nobody yet, so they stay visible to
-      // both businesses rather than being filtered into invisibility.
-      const where = department
-        ? { OR: [{ department }, { department: null }] }
-        : {};
+      // Templates synced from Meta arrive unassigned, and stay visible.
+      const where = OWN_OR_GLOBAL;
 
       const [templates, approved, pending] = await Promise.all([
         prisma.whatsappTemplate.findMany({
@@ -60,6 +55,7 @@ export default async function TemplatesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Support & Messaging"
         title="WhatsApp Templates"
         description="Meta-approved message templates. Broadcasts, acknowledgements and reminders all send through these — a template Meta has not approved cannot reach anyone outside the 24-hour reply window."
       />
@@ -95,7 +91,7 @@ export default async function TemplatesPage() {
       </div>
 
       <div className="mb-5">
-        <TemplateToolbar canSync={config.whatsapp.templatesEnabled} department={department} />
+        <TemplateToolbar canSync={config.whatsapp.templatesEnabled} />
         {lastSync && (
           <p className="mt-2 text-[11px] text-muted-foreground">
             Last synced from Meta {formatDateTime(lastSync)}.
@@ -106,11 +102,7 @@ export default async function TemplatesPage() {
       {data.templates.length ? (
         <div className="grid gap-3 md:grid-cols-2">
           {data.templates.map((template) => (
-            <Card
-              key={template.id}
-              data-department={template.department ?? undefined}
-              className="flex flex-col p-4"
-            >
+            <Card key={template.id} className="flex flex-col p-5">
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="text-sm font-semibold">{template.name}</h3>
@@ -153,13 +145,6 @@ export default async function TemplatesPage() {
               )}
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2">
-                {template.department ? (
-                  <DepartmentTag department={template.department} />
-                ) : (
-                  <span className="rounded-full border border-dashed px-2 py-0.5 text-[11px] text-muted-foreground">
-                    Unassigned
-                  </span>
-                )}
                 <span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">
                   {template.category.toLowerCase()}
                 </span>
@@ -182,8 +167,6 @@ export default async function TemplatesPage() {
                 <TemplateCardActions
                   id={template.id}
                   metaName={template.metaName}
-                  department={template.department}
-                  locked={Boolean(department)}
                   inMeta={Boolean(template.metaId)}
                 />
               </div>

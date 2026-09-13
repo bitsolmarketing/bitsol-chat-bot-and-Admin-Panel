@@ -4,8 +4,8 @@ import { rateLimit } from "./redis";
 import type { SubmissionResult } from "@/types";
 
 /**
- * Small helpers shared by the public submission endpoints (leads, admissions,
- * meetings, tickets) so rate limiting, client identification, conversation
+ * Small helpers shared by the public submission endpoints (leads, meetings,
+ * tickets) so rate limiting, client identification, conversation
  * linking and response shape stay identical across all of them.
  */
 

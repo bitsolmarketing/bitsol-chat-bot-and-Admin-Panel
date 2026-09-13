@@ -3,12 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCheck, Send, TriangleAlert, Users } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { canAccessDepartment } from "@/lib/auth";
-import { safeQuery } from "@/lib/admin/queries";
+import { isOwn, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
   StatusBadge,
@@ -33,7 +31,7 @@ export default async function BroadcastDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireAdmin("/admin/messaging/broadcasts");
+  await requireAdmin("/admin/messaging/broadcasts");
   const { id } = await params;
 
   const { data, error } = await safeQuery(
@@ -73,11 +71,9 @@ export default async function BroadcastDetailPage({
     );
   }
 
-  if (!data) notFound();
+  if (!data || !isOwn(data.broadcast.department)) notFound();
 
   const { broadcast, recipients, pending } = data;
-
-  if (!canAccessDepartment(session, broadcast.department)) notFound();
 
   return (
     <>
@@ -89,13 +85,13 @@ export default async function BroadcastDetailPage({
       </Link>
 
       <PageHeader
+        eyebrow="Broadcast"
         title={broadcast.title}
         description={`${broadcast.reference} · created by ${broadcast.createdBy?.name ?? "an earlier version of this console"} on ${formatDateTime(broadcast.createdAt)}`}
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <StatusBadge value={broadcast.status} />
-        <DepartmentTag department={broadcast.department} />
         {broadcast.templateName && (
           <span className="rounded-full border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
             {broadcast.templateName} · {broadcast.languageCode}

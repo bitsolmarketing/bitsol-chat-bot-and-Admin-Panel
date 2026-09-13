@@ -7,7 +7,7 @@ import {
   shouldEscalate,
   suggestFollowUps,
 } from "@/lib/ai";
-import { asDepartment, BRANDS, type Department } from "@/lib/brands";
+import { BRAND, DEPARTMENT } from "@/lib/brands";
 import { generateReference, generateConversationReference } from "@/lib/utils";
 import { rateLimit } from "@/lib/redis";
 import { prisma } from "@/lib/db";
@@ -29,10 +29,6 @@ const bodySchema = z.object({
     .min(1)
     .max(50),
   conversationRef: z.string().max(64).optional(),
-  /** Department already pinned to this conversation (sticky memory). */
-  department: z.enum(["MARKETING", "INSTITUTE"]).nullish(),
-  /** Explicit pick from the welcome menu or the department switcher. */
-  requestedDepartment: z.enum(["MARKETING", "INSTITUTE"]).nullish(),
 });
 
 function sse(event: ChatStreamEvent): string {
@@ -67,21 +63,13 @@ export async function POST(req: NextRequest) {
   }
   const { messages, conversationRef } = parsed.data;
 
-  // --- Route: which business does this turn belong to? ----------------------
-  const plan = planAssistantTurn(messages, {
-    department: asDepartment(parsed.data.department),
-    requestedDepartment: asDepartment(parsed.data.requestedDepartment),
-  });
+  const plan = planAssistantTurn(messages);
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const userText = lastUser?.content ?? "";
-  const department = plan.department;
 
-  // Escalation only makes sense once we know which team to escalate to.
-  const escalate = Boolean(department) && shouldEscalate(userText);
-  const ticketId =
-    escalate && department ? generateReference("TKT", department) : undefined;
-  const action = detectAction(userText, department);
+  const ticketId = shouldEscalate(userText) ? generateReference("TKT") : undefined;
+  const action = detectAction(userText);
 
   const encoder = new TextEncoder();
   const startedAt = Date.now();
@@ -90,13 +78,9 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       let assistantText = "";
 
-      // Tell the client the routing outcome immediately so it can re-theme to
-      // the right brand while the model is still generating.
-      controller.enqueue(
-        encoder.encode(
-          sse({ type: "meta", department, language: plan.language })
-        )
-      );
+      // Tell the client the detected language immediately so it can switch
+      // text direction while the model is still generating.
+      controller.enqueue(encoder.encode(sse({ type: "meta", language: plan.language })));
 
       try {
         for await (const chunk of streamAssistantReply(messages, plan)) {
@@ -104,11 +88,8 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(sse({ type: "chunk", text: chunk })));
         }
 
-        if (ticketId && department) {
-          const brand = BRANDS[department];
-          const note = `\n\n🎫 I've created ticket **${ticketId}** and passed this to the ${
-            department === "MARKETING" ? "BITSOL Marketing team" : "BITSOL Institute admissions team"
-          }. Keep this reference for follow-up — you can also reach them on ${brand.contact.phone}.`;
+        if (ticketId) {
+          const note = `\n\n🎫 I've created ticket **${ticketId}** and passed this to the ${BRAND.name} team. Keep this reference for follow-up — you can also reach them on ${BRAND.contact.phone}.`;
           assistantText += note;
           controller.enqueue(encoder.encode(sse({ type: "chunk", text: note })));
         }
@@ -118,8 +99,7 @@ export async function POST(req: NextRequest) {
             sse({
               type: "done",
               ticketId,
-              department,
-              suggestions: suggestFollowUps(department, userText),
+              suggestions: suggestFollowUps(userText),
               action,
             })
           )
@@ -142,7 +122,6 @@ export async function POST(req: NextRequest) {
       // --- Best-effort persistence (skips silently if the DB is down) -------
       void persist({
         conversationRef,
-        department,
         language: LANGUAGE_MAP[plan.language],
         userText,
         assistantText,
@@ -166,37 +145,22 @@ export async function POST(req: NextRequest) {
 /** Store the exchange for chat history, CRM context and analytics. */
 async function persist(opts: {
   conversationRef?: string;
-  department: Department | null;
   language: PrismaLanguage;
   userText: string;
   assistantText: string;
   ticketId?: string;
   latencyMs: number;
 }) {
-  const {
-    conversationRef,
-    department,
-    language,
-    userText,
-    assistantText,
-    ticketId,
-    latencyMs,
-  } = opts;
+  const { conversationRef, language, userText, assistantText, ticketId, latencyMs } = opts;
 
   const reference = conversationRef ?? generateConversationReference();
 
   const conversation = await prisma.conversation.upsert({
     where: { reference },
-    // Department is written once it is known and then kept — a mid-conversation
-    // switch updates it, but a neutral follow-up never clears it.
-    update: {
-      updatedAt: new Date(),
-      language,
-      ...(department ? { department } : {}),
-    },
+    update: { updatedAt: new Date(), language },
     create: {
       reference,
-      department,
+      department: DEPARTMENT,
       language,
       title: userText.slice(0, 80),
     },
@@ -208,7 +172,7 @@ async function persist(opts: {
         conversationId: conversation.id,
         role: "USER",
         content: userText,
-        department,
+        department: DEPARTMENT,
         language,
       },
     });
@@ -219,17 +183,17 @@ async function persist(opts: {
       conversationId: conversation.id,
       role: "ASSISTANT",
       content: assistantText,
-      department,
+      department: DEPARTMENT,
       language,
       latencyMs,
     },
   });
 
-  if (ticketId && department) {
+  if (ticketId) {
     await prisma.ticket.create({
       data: {
         reference: ticketId,
-        department,
+        department: DEPARTMENT,
         category: "GENERAL",
         subject: "Escalated from the BITSOL AI Assistant",
         description: userText,
@@ -243,7 +207,6 @@ async function persist(opts: {
     });
 
     await notifyTeam({
-      department,
       subject: `Human handoff requested — ${ticketId}`,
       body: `A visitor asked for a human.\n\nTicket: ${ticketId}\nConversation: ${reference}\n\nTheir message:\n${userText}`,
       link: `/admin/support/tickets`,
@@ -251,7 +214,6 @@ async function persist(opts: {
 
     await logEvent({
       action: "chat.escalated",
-      department,
       entity: "Ticket",
       entityId: ticketId,
       message: "Assistant escalated a conversation to a human.",

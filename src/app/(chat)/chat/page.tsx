@@ -1,41 +1,37 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft, Bot } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { BitsolBranding } from "@/components/branding/BitsolBranding";
-import { BRANDING } from "@/lib/branding";
-import { BRANDS } from "@/lib/brands";
+import { Logo } from "@/components/branding/Logo";
+import { BRAND } from "@/lib/brands";
 
 export const metadata: Metadata = {
-  title: "AI Assistant",
-  description:
-    "Chat with the BITSOL AI Assistant — services, quotes and consultations for BITSOL Marketing; courses, admissions and fees for BITSOL Institute.",
+  title: "AI Concierge",
+  description: `Talk to the ${BRAND.name} AI concierge — services, pricing, quotes and free consultations, 24/7, in English, Urdu, Roman Urdu or Punjabi.`,
 };
 
 export default function ChatPage() {
   return (
-    <div className="brand-gradient flex min-h-dvh flex-col items-center justify-center p-0 sm:p-6">
-      <div className="flex h-dvh w-full max-w-4xl flex-col overflow-hidden bg-card shadow-glow sm:h-[min(92dvh,940px)] sm:rounded-3xl">
+    <div className="dark brand-gradient relative flex min-h-dvh flex-col items-center justify-center overflow-hidden p-0 sm:p-6">
+      <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden />
+
+      <div className="ring-gradient relative flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-brand-ink/80 shadow-glow backdrop-blur-xl sm:h-[min(92dvh,960px)] sm:rounded-[1.75rem]">
         {/* Widget header */}
-        <header className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-soft">
-              <Bot className="size-5" />
+        <header className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-5">
+          <Logo descriptor="AI Concierge" />
+          <div className="flex items-center gap-4">
+            <span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-medium text-white/65 md:inline-flex">
+              <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]" />
+              Replies in seconds · 24/7
             </span>
-            <div className="flex flex-col leading-tight">
-              <span className="text-sm font-bold">{BRANDING.product.name}</span>
-              <span className="text-[11px] text-muted-foreground">
-                {BRANDS.MARKETING.emoji} {BRANDS.MARKETING.shortName} ·{" "}
-                {BRANDS.INSTITUTE.emoji} {BRANDS.INSTITUTE.shortName}
-              </span>
-            </div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-white/55 transition hover:text-white"
+            >
+              <ArrowLeft className="size-3.5" /> Home
+            </Link>
           </div>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary"
-          >
-            <ArrowLeft className="size-3.5" /> Home
-          </Link>
         </header>
 
         {/* Chat */}
@@ -44,7 +40,7 @@ export default function ChatPage() {
         </div>
 
         {/* Chat widget footer — branding */}
-        <div className="border-t bg-card px-4 py-2.5">
+        <div className="border-t border-white/[0.06] px-4 py-2.5">
           <BitsolBranding className="justify-center" />
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { verifyPassword, signSession, SESSION_COOKIE } from "@/lib/auth";
+import { isRetiredAccount, verifyPassword, signSession, SESSION_COOKIE } from "@/lib/auth";
 import { config } from "@/lib/config";
 
 export const runtime = "nodejs";
@@ -26,6 +26,13 @@ export async function POST(req: NextRequest) {
 
     if (!user || !user.passwordHash || !user.isActive) return invalid();
     if (!(await verifyPassword(password, user.passwordHash))) return invalid();
+    // Only reached with the right password, so saying why is not a leak.
+    if (isRetiredAccount(user.department)) {
+      return Response.json(
+        { error: "This account belonged to BITSOL Institute, which is no longer part of this console." },
+        { status: 403 }
+      );
+    }
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 

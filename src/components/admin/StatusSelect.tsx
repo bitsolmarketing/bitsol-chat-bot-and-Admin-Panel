@@ -22,13 +22,7 @@ export function StatusSelect({
   className,
 }: {
   /** Resource segment on /api/admin/<entity>/<id>. */
-  entity:
-    | "leads"
-    | "admissions"
-    | "tickets"
-    | "meetings"
-    | "knowledge-marketing"
-    | "knowledge-institute";
+  entity: "leads" | "tickets" | "meetings" | "knowledge";
   id: string;
   /** Which field this control writes. */
   field: "stage" | "status" | "priority" | "state";
@@ -71,7 +65,7 @@ export function StatusSelect({
         disabled={saving}
         onChange={(e) => void change(e.target.value)}
         aria-label={`Change ${field}`}
-        className={`h-7 rounded-full border bg-background px-2 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${
+        className={`h-7 rounded-full border bg-card px-2.5 text-[11px] font-semibold shadow-sm transition hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 ${
           error ? "border-destructive" : ""
         } ${className ?? ""}`}
       >

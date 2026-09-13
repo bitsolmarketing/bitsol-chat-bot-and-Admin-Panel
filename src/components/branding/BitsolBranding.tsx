@@ -19,7 +19,7 @@ export function BitsolBranding({
     return (
       <div className={cn("flex flex-col items-center gap-1 text-center", className)}>
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <Sparkles className="size-3.5 text-accent" aria-hidden />
+          <Sparkles className="size-3.5 text-brand-cyan" aria-hidden />
           {BRANDING.product.poweredBy}
         </span>
         <span className="text-xs text-muted-foreground">
@@ -28,7 +28,7 @@ export function BitsolBranding({
             href={brandUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-foreground hover:text-primary"
+            className="font-semibold text-foreground hover:text-brand-cyan"
           >
             {brandName}
           </Link>
@@ -40,17 +40,17 @@ export function BitsolBranding({
   return (
     <p
       className={cn(
-        "inline-flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground",
+        "inline-flex flex-wrap items-center justify-center gap-1.5 text-[11px] text-muted-foreground",
         className
       )}
     >
-      <Sparkles className="size-3.5 text-accent" aria-hidden />
+      <Sparkles className="size-3.5 text-brand-cyan" aria-hidden />
       <span>Designed &amp; Developed by</span>
       <Link
         href={brandUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-semibold text-foreground transition-colors hover:text-primary"
+        className="font-semibold tracking-wide text-foreground transition-colors hover:text-brand-cyan"
       >
         {brandName}
       </Link>

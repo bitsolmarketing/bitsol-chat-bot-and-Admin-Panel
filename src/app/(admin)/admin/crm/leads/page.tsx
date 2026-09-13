@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LeadSource, LeadStage, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
@@ -14,9 +14,8 @@ import {
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { findService } from "@/data/marketing/services";
 import { formatDate, humanise, truncate } from "@/lib/utils";
-import { notFound } from "next/navigation";
 
-export const metadata = { title: "Marketing Leads" };
+export const metadata = { title: "Leads" };
 
 const STAGES: LeadStage[] = [
   "NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST",
@@ -31,9 +30,7 @@ export default async function LeadsPage({
 }: {
   searchParams: Promise<{ stage?: string; source?: string }>;
 }) {
-  const session = await requireAdmin("/admin/crm/leads");
-  // Institute-scoped staff have no business in the sales pipeline.
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/crm/leads");
 
   const { stage, source } = await searchParams;
   const active = STAGES.includes(stage as LeadStage) ? (stage as LeadStage) : undefined;
@@ -95,9 +92,9 @@ export default async function LeadsPage({
   return (
     <>
       <PageHeader
-        title="Marketing Leads"
-        department="MARKETING"
-        description="Every enquiry captured by the assistant, WhatsApp, the website and your team — moved through the BITSOL Marketing sales pipeline."
+        eyebrow="Clients"
+        title="Leads"
+        description="Every enquiry captured by the assistant, WhatsApp, the website and your team — moved through the sales pipeline."
       />
 
       {error && <DbNotice error={error} />}

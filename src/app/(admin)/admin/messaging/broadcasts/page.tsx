@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope, sessionDepartment } from "@/lib/admin/queries";
+import { OWN, OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   Callout,
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
   StatusBadge,
@@ -28,31 +27,26 @@ export const metadata = { title: "Broadcasts" };
  * them is the first thing to look at when a campaign underperforms.
  */
 export default async function BroadcastsPage() {
-  const session = await requireAdmin("/admin/messaging/broadcasts");
-  const department = sessionDepartment(session);
+  await requireAdmin("/admin/messaging/broadcasts");
 
   const { data, error } = await safeQuery(
     async () => {
       const [broadcasts, sent, reach, templates, waiting] = await Promise.all([
         prisma.broadcast.findMany({
-          where: scope(session),
+          where: OWN,
           orderBy: { createdAt: "desc" },
           take: 100,
           include: { template: { select: { name: true, status: true } } },
         }),
-        prisma.broadcast.count({ where: { ...scope(session), status: "SENT" } }),
+        prisma.broadcast.count({ where: { ...OWN, status: "SENT" } }),
         prisma.broadcast.aggregate({
-          where: { ...scope(session), status: "SENT" },
+          where: { ...OWN, status: "SENT" },
           _sum: { delivered: true },
         }),
         // Only approved templates can open a conversation outside the 24-hour
         // window, so they are the only ones the composer is given.
         prisma.whatsappTemplate.findMany({
-          where: {
-            status: "APPROVED",
-            metaId: { not: null },
-            ...(department ? { OR: [{ department }, { department: null }] } : {}),
-          },
+          where: { status: "APPROVED", metaId: { not: null }, ...OWN_OR_GLOBAL },
           orderBy: { name: "asc" },
           select: {
             id: true,
@@ -64,7 +58,6 @@ export default async function BroadcastsPage() {
             headerFormat: true,
             footerText: true,
             variables: true,
-            department: true,
           },
         }),
         // Recipients still to be messaged, per broadcast — what the Send and
@@ -96,6 +89,7 @@ export default async function BroadcastsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Support & Messaging"
         title="Broadcasts"
         description="Segmented WhatsApp campaigns sent through Meta-approved templates, always to opted-in audiences. Anyone who has sent STOP is excluded automatically."
       />
@@ -136,7 +130,7 @@ export default async function BroadcastsPage() {
       </div>
 
       <div className="mb-5">
-        <BroadcastComposer templates={data.templates} department={department} />
+        <BroadcastComposer templates={data.templates} />
       </div>
 
       <DataTable
@@ -155,7 +149,6 @@ export default async function BroadcastsPage() {
               </Link>
             ),
           },
-          { header: "Business", cell: (row) => <DepartmentTag department={row.department} /> },
           {
             header: "Campaign",
             cell: (row) => (

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { DEPARTMENT } from "@/lib/brands";
 import { generateReference } from "@/lib/utils";
 import { logEvent, notifyTeam } from "@/lib/notify";
 import { clientIp, conversationIdFor, created, failed, invalid, throttle } from "@/lib/api";
@@ -9,14 +10,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Support ticket creation — used by both businesses.
+ * Support ticket creation.
  *
  * Categories follow the brief: Technical Support, Billing, Sales, Complaint and
  * General Inquiry. Complaints are raised at HIGH priority automatically so they
  * surface at the top of the support queue.
  */
 const bodySchema = z.object({
-  department: z.enum(["MARKETING", "INSTITUTE"]),
   category: z.enum(["TECHNICAL", "BILLING", "SALES", "COMPLAINT", "GENERAL"]),
   name: z.string().min(2).max(120),
   phone: z.string().max(32).optional(),
@@ -34,13 +34,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return invalid();
 
   const data = parsed.data;
-  const reference = generateReference("TKT", data.department);
+  const reference = generateReference("TKT");
 
   try {
     const ticket = await prisma.ticket.create({
       data: {
         reference,
-        department: data.department,
+        department: DEPARTMENT,
         category: data.category,
         status: "OPEN",
         priority: data.category === "COMPLAINT" ? "HIGH" : "NORMAL",
@@ -55,7 +55,6 @@ export async function POST(req: NextRequest) {
     });
 
     await notifyTeam({
-      department: data.department,
       subject: `New ${data.category.toLowerCase()} ticket ${reference} — ${data.subject}`,
       body: [
         `Reference: ${reference}`,
@@ -73,7 +72,6 @@ export async function POST(req: NextRequest) {
 
     await logEvent({
       action: "ticket.created",
-      department: data.department,
       entity: "Ticket",
       entityId: ticket.id,
       message: `Ticket ${reference} raised from the assistant.`,

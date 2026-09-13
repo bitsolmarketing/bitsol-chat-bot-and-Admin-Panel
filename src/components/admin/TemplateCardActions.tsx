@@ -4,30 +4,16 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/field";
-import type { Department } from "@/lib/brands";
 
-/**
- * Per-template controls: which business owns it, and deleting it.
- *
- * A template synced from Meta arrives with no business attached, because Meta
- * has no idea this account serves two of them. Until someone assigns one it
- * shows in both lists — visible to everybody is the safe default; guessing
- * would hide it from the half of the staff who needed it.
- */
+/** Per-template controls — currently just deleting it. */
 export function TemplateCardActions({
   id,
   metaName,
-  department,
-  /** Locked for staff restricted to one business — they cannot hand it over. */
-  locked,
   /** True once Meta knows about it: deleting then removes it there too. */
   inMeta,
 }: {
   id: string;
   metaName: string;
-  department: Department | null;
-  locked: boolean;
   inMeta: boolean;
 }) {
   const router = useRouter();
@@ -35,25 +21,6 @@ export function TemplateCardActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-
-  async function assign(value: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/templates/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ department: value === "" ? null : value }),
-      });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) throw new Error(data?.error ?? "Could not reassign that template.");
-      startTransition(() => router.refresh());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reassign that template.");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function remove() {
     setBusy(true);
@@ -99,8 +66,9 @@ export function TemplateCardActions({
           </Button>
           <Button
             type="button"
+            variant="destructive"
             size="sm"
-            className="h-7 gap-1 bg-destructive text-[11px] text-destructive-foreground hover:bg-destructive/90"
+            className="h-7 gap-1 text-[11px]"
             onClick={remove}
             disabled={busy}
           >
@@ -112,34 +80,25 @@ export function TemplateCardActions({
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5">
-        <Select
-          value={department ?? ""}
-          onChange={(e) => assign(e.target.value)}
-          disabled={busy || locked}
-          aria-label="Business this template belongs to"
-          className="h-8 flex-1 text-[11px]"
-        >
-          <option value="">Both businesses</option>
-          <option value="MARKETING">BITSOL Marketing</option>
-          <option value="INSTITUTE">BITSOL Institute</option>
-        </Select>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-muted-foreground hover:text-destructive"
-          onClick={() => setConfirming(true)}
-          disabled={busy}
-          aria-label={`Delete ${metaName}`}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-      </div>
-
-      {error && <p className="text-[11px] text-destructive">{error}</p>}
+    <div className="flex items-center justify-between gap-2">
+      {error ? (
+        <p className="text-[11px] text-destructive">{error}</p>
+      ) : (
+        <span className="text-[11px] text-muted-foreground">
+          {inMeta ? "Managed in Meta" : "Local draft"}
+        </span>
+      )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-8 gap-1.5 px-2.5 text-[11px] text-muted-foreground hover:text-destructive"
+        onClick={() => setConfirming(true)}
+        disabled={busy}
+        aria-label={`Delete ${metaName}`}
+      >
+        <Trash2 className="size-3.5" /> Delete
+      </Button>
     </div>
   );
 }

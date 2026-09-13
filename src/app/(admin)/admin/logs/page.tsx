@@ -1,12 +1,11 @@
-import Link from "next/link";
 import type { LogLevel } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
+  FilterChip,
   PageHeader,
   StatusBadge,
 } from "@/components/admin/ui";
@@ -21,13 +20,13 @@ export default async function LogsPage({
 }: {
   searchParams: Promise<{ level?: string }>;
 }) {
-  const session = await requireAdmin("/admin/logs");
+  await requireAdmin("/admin/logs");
   const { level } = await searchParams;
   const active = LEVELS.includes(level as LogLevel) ? (level as LogLevel) : undefined;
 
   const { data, error } = await safeQuery(
     async () => {
-      const where = { ...scope(session), ...(active ? { level: active } : {}) };
+      const where = { ...OWN_OR_GLOBAL, ...(active ? { level: active } : {}) };
       const [logs, counts] = await Promise.all([
         prisma.systemLog.findMany({
           where,
@@ -38,7 +37,7 @@ export default async function LogsPage({
         prisma.systemLog.groupBy({
           by: ["level"],
           _count: { _all: true },
-          where: scope(session),
+          where: OWN_OR_GLOBAL,
         }),
       ]);
       return { logs, counts };
@@ -53,8 +52,9 @@ export default async function LogsPage({
   return (
     <>
       <PageHeader
+        eyebrow="Administration"
         title="System Logs"
-        description="Audit trail of every lead, admission, ticket, meeting and record change — who did what, when, and from where."
+        description="Audit trail of every lead, ticket, meeting and record change — who did what, when, and from where."
       />
 
       {error && <DbNotice error={error} />}
@@ -91,15 +91,6 @@ export default async function LogsPage({
             cell: (row) => <span className="font-mono text-xs">{row.action}</span>,
           },
           {
-            header: "Business",
-            cell: (row) =>
-              row.department ? (
-                <DepartmentTag department={row.department} />
-              ) : (
-                <span className="text-xs text-muted-foreground">System</span>
-              ),
-          },
-          {
             header: "Detail",
             cell: (row) => (
               <div className="min-w-0 max-w-md">
@@ -125,33 +116,5 @@ export default async function LogsPage({
         ]}
       />
     </>
-  );
-}
-
-function FilterChip({
-  href,
-  label,
-  count,
-  active,
-}: {
-  href: string;
-  label: string;
-  count: number;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-card hover:bg-secondary"
-      }`}
-    >
-      {label}
-      <span className={active ? "ml-1.5 opacity-80" : "ml-1.5 text-muted-foreground"}>
-        {count}
-      </span>
-    </Link>
   );
 }

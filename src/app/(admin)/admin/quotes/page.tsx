@@ -1,7 +1,6 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import { DataTable, DbNotice, PageHeader, StatCard, StatusBadge } from "@/components/admin/ui";
 import { FileCheck2, ReceiptText, Send } from "lucide-react";
 import { formatDate, formatPkr } from "@/lib/utils";
@@ -9,8 +8,7 @@ import { formatDate, formatPkr } from "@/lib/utils";
 export const metadata = { title: "Quotations" };
 
 export default async function QuotesPage() {
-  const session = await requireAdmin("/admin/quotes");
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/quotes");
 
   const { data, error } = await safeQuery(
     async () => {
@@ -38,22 +36,21 @@ export default async function QuotesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Clients"
         title="Quotations"
-        department="MARKETING"
         description="Written quotations raised against leads and customers. The assistant never quotes a final price — this is where the real number is issued."
       />
 
       {error && <DbNotice error={error} />}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <StatCard label="Sent" value={data.sent} icon={Send} department="MARKETING" />
-        <StatCard label="Accepted" value={data.accepted} icon={FileCheck2} department="MARKETING" />
+        <StatCard label="Sent" value={data.sent} icon={Send} />
+        <StatCard label="Accepted" value={data.accepted} icon={FileCheck2} />
         <StatCard
           label="Value in play"
           value={formatPkr(data.pipeline)}
           hint="Sent + accepted"
           icon={ReceiptText}
-          department="MARKETING"
         />
       </div>
 

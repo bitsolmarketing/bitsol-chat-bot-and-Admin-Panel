@@ -1,11 +1,10 @@
 import type { MeetingStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
   StatusBadge,
@@ -28,7 +27,7 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 export default async function MeetingsPage() {
-  const session = await requireAdmin("/admin/meetings");
+  await requireAdmin("/admin/meetings");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -36,20 +35,20 @@ export default async function MeetingsPage() {
     async () => {
       const [meetings, upcoming, confirmed, cancelled] = await Promise.all([
         prisma.meeting.findMany({
-          where: scope(session),
+          where: OWN,
           orderBy: [{ preferredDate: "asc" }, { createdAt: "desc" }],
           take: 100,
         }),
         prisma.meeting.count({
           where: {
-            ...scope(session),
+            ...OWN,
             preferredDate: { gte: today },
             status: { in: ["REQUESTED", "CONFIRMED", "RESCHEDULED"] },
           },
         }),
-        prisma.meeting.count({ where: { ...scope(session), status: "CONFIRMED" } }),
+        prisma.meeting.count({ where: { ...OWN, status: "CONFIRMED" } }),
         prisma.meeting.count({
-          where: { ...scope(session), status: { in: ["CANCELLED", "NO_SHOW"] } },
+          where: { ...OWN, status: { in: ["CANCELLED", "NO_SHOW"] } },
         }),
       ]);
       return { meetings, upcoming, confirmed, cancelled };
@@ -60,8 +59,9 @@ export default async function MeetingsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Clients"
         title="Meetings"
-        description="Consultations and counselling sessions booked through the assistant. Confirm them and the customer keeps their reference."
+        description="Consultations booked through the assistant and WhatsApp. Confirm them and the client keeps their reference."
       />
 
       {error && <DbNotice error={error} />}
@@ -81,7 +81,6 @@ export default async function MeetingsPage() {
             header: "Reference",
             cell: (row) => <span className="font-mono text-xs">{row.reference}</span>,
           },
-          { header: "Business", cell: (row) => <DepartmentTag department={row.department} /> },
           {
             header: "Requested by",
             cell: (row) => (

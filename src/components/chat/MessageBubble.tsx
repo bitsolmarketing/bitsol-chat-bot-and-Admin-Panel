@@ -1,12 +1,12 @@
-import { Bot, Building2, GraduationCap, User2, Volume2 } from "lucide-react";
+import { User2, Volume2 } from "lucide-react";
+import { LogoMark } from "@/components/branding/Logo";
 import { cn, isUrduScript } from "@/lib/utils";
 import type { ChatMessage } from "@/types";
 
 /**
  * Renders a single chat message. Detects Urdu/Punjabi script to switch to RTL,
- * shows a department-specific assistant avatar, and applies a small, safe text
- * formatter (bold + bullets + headings) so responses read well without pulling
- * in a full markdown renderer.
+ * and applies a small, safe text formatter (bold + bullets + headings) so
+ * responses read well without pulling in a full markdown renderer.
  */
 export function MessageBubble({
   message,
@@ -18,31 +18,35 @@ export function MessageBubble({
   const isUser = message.role === "user";
   const rtl = isUrduScript(message.content);
 
-  const AssistantIcon =
-    message.department === "MARKETING"
-      ? Building2
-      : message.department === "INSTITUTE"
-        ? GraduationCap
-        : Bot;
-
   return (
-    <div className={cn("flex w-full gap-3", isUser ? "flex-row-reverse" : "flex-row")}>
-      <span
-        className={cn(
-          "mt-1 grid size-8 shrink-0 place-items-center rounded-lg shadow-sm",
-          isUser ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
-        )}
-        aria-hidden
-      >
-        {isUser ? <User2 className="size-4" /> : <AssistantIcon className="size-4" />}
-      </span>
+    <div
+      className={cn(
+        "flex w-full animate-fade-in-up gap-3",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}
+    >
+      {isUser ? (
+        <span
+          className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-white/[0.07] text-white/70 ring-1 ring-inset ring-white/10"
+          aria-hidden
+        >
+          <User2 className="size-4" />
+        </span>
+      ) : (
+        <span
+          className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-brand-ink ring-1 ring-brand-cyan/30"
+          aria-hidden
+        >
+          <LogoMark className="size-7" />
+        </span>
+      )}
 
       <div
         className={cn(
-          "group relative max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm md:max-w-[75%]",
+          "group relative max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed md:max-w-[78%]",
           isUser
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md bg-secondary text-secondary-foreground"
+            ? "rounded-tr-md bg-brand text-white shadow-brand"
+            : "rounded-tl-md border border-white/[0.07] bg-white/[0.035] text-white/90"
         )}
       >
         <div className={cn(rtl && "urdu")}>{renderContent(message.content)}</div>
@@ -52,7 +56,7 @@ export function MessageBubble({
             type="button"
             onClick={() => onSpeak(message.content)}
             aria-label="Read this answer aloud"
-            className="absolute -bottom-3 right-2 hidden rounded-full bg-background p-1.5 text-muted-foreground shadow ring-1 ring-border transition group-hover:block hover:text-primary"
+            className="absolute -bottom-3 right-2 hidden rounded-full bg-brand-slate p-1.5 text-white/60 shadow ring-1 ring-white/10 transition hover:text-brand-cyan group-hover:block"
           >
             <Volume2 className="size-3.5" />
           </button>
@@ -73,7 +77,7 @@ function renderContent(text: string) {
     const heading = /^\*\*(.+)\*\*:?$/.exec(trimmed);
     if (heading) {
       return (
-        <p key={i} className={cn("font-semibold", i > 0 && "mt-2.5")}>
+        <p key={i} className={cn("font-semibold text-white", i > 0 && "mt-3")}>
           {heading[1]}
         </p>
       );
@@ -86,7 +90,9 @@ function renderContent(text: string) {
     if (bullet || numbered) {
       return (
         <p key={i} className={cn("flex gap-2", i > 0 && "mt-1")}>
-          <span className="select-none text-accent">{numbered ? `${numbered[1]}.` : "•"}</span>
+          <span className="select-none font-semibold text-brand-cyan">
+            {numbered ? `${numbered[1]}.` : "•"}
+          </span>
           <span>{formatInline(clean)}</span>
         </p>
       );
@@ -104,11 +110,15 @@ function formatInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_)/g);
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={i} className="font-semibold">
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     if (part.length > 2 && part.startsWith("_") && part.endsWith("_")) {
       return (
-        <em key={i} className="opacity-80">
+        <em key={i} className="opacity-75">
           {part.slice(1, -1)}
         </em>
       );

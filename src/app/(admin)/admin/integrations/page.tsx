@@ -109,6 +109,7 @@ export default async function IntegrationsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Administration"
         title="Integrations"
         description="What's wired up and what still needs credentials."
       />
@@ -125,7 +126,7 @@ export default async function IntegrationsPage() {
             <span
               className={`grid size-10 shrink-0 place-items-center rounded-xl ${
                 integration.configured
-                  ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                   : "bg-secondary text-muted-foreground"
               }`}
             >
@@ -137,8 +138,8 @@ export default async function IntegrationsPage() {
                 <span
                   className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                     integration.configured
-                      ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400"
-                      : "bg-amber-500/14 text-amber-700 dark:text-amber-400"
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
                   }`}
                 >
                   {integration.configured ? "Configured" : "Not configured"}

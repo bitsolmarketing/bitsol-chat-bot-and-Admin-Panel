@@ -3,32 +3,29 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, LogOut, Menu, X } from "lucide-react";
+import { ExternalLink, LogOut, Menu, X } from "lucide-react";
 import { visibleNav } from "./nav";
-import { BRANDING } from "@/lib/branding";
-import { BRANDS, type Department } from "@/lib/brands";
-import { cn } from "@/lib/utils";
+import { Logo } from "@/components/branding/Logo";
+import { cn, humanise } from "@/lib/utils";
 
 export interface AdminUser {
   name: string;
   role: string;
-  department: Department | null;
 }
 
 export interface NavBadges {
   openTickets?: number;
   newLeads?: number;
-  newAdmissions?: number;
 }
 
 /**
- * Admin console shell — sidebar, mobile drawer and top bar.
+ * Admin console shell — midnight sidebar, mobile drawer and a light workspace.
  *
  * The nav tree is built HERE rather than in the server layout, because each
  * item carries a Lucide `icon` — a function, which React cannot serialize
- * across the server/client boundary. The server passes only the two
- * serializable inputs the filter needs (`department` and the granted
- * `permissions`), and the icons never leave the client bundle.
+ * across the server/client boundary. The server passes only the serializable
+ * input the filter needs (the granted `permissions`), and the icons never
+ * leave the client bundle.
  */
 export function AdminShell({
   user,
@@ -46,12 +43,12 @@ export function AdminShell({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const groups = visibleNav(
-    user.department,
-    permissions ? new Set(permissions) : null
-  );
-
-  const scope = user.department ? BRANDS[user.department].shortName : "All businesses";
+  const groups = visibleNav(permissions ? new Set(permissions) : null);
+  const initials = user.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -60,25 +57,23 @@ export function AdminShell({
   }
 
   const sidebar = (
-    <div className="flex h-full flex-col">
-      <Link
-        href="/admin"
-        className="flex items-center gap-2.5 border-b px-4 py-4"
-        onClick={() => setOpen(false)}
-      >
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
-          <Bot className="size-5" />
-        </span>
-        <span className="flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-sm font-bold">{BRANDING.product.shortName}</span>
-          <span className="truncate text-[11px] text-muted-foreground">Admin console</span>
-        </span>
-      </Link>
+    <div className="dark brand-gradient flex h-full flex-col text-foreground">
+      <div className="flex items-center justify-between px-5 pb-4 pt-5">
+        <Logo href="/admin" descriptor="Admin console" size="sm" />
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close navigation"
+          className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground lg:hidden"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
 
-      <nav className="scroll-slim flex-1 overflow-y-auto px-2 py-3">
+      <nav className="scroll-slim flex-1 overflow-y-auto px-3 pb-4">
         {groups.map((group) => (
-          <div key={group.label} className="mb-4">
-            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div key={group.label} className="mt-4 first:mt-1">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/35">
               {group.label}
             </p>
             <ul className="space-y-0.5">
@@ -94,25 +89,29 @@ export function AdminShell({
                     <Link
                       href={item.href}
                       onClick={() => setOpen(false)}
-                      data-department={item.department}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors",
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-all",
                         active
-                          ? "bg-primary text-primary-foreground shadow-soft"
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                          ? "bg-white/[0.07] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+                          : "text-white/60 hover:bg-white/[0.04] hover:text-white"
                       )}
                     >
-                      <item.icon className="size-4 shrink-0" />
+                      {active && (
+                        <span
+                          className="absolute inset-y-2 left-0 w-[3px] rounded-full bg-brand-cyan shadow-glow-cyan"
+                          aria-hidden
+                        />
+                      )}
+                      <item.icon
+                        className={cn(
+                          "size-4 shrink-0 transition-colors",
+                          active ? "text-brand-cyan" : "text-white/45 group-hover:text-white/80"
+                        )}
+                      />
                       <span className="flex-1 truncate">{item.label}</span>
                       {badge ? (
-                        <span
-                          className={cn(
-                            "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                            active
-                              ? "bg-primary-foreground/20"
-                              : "bg-accent/15 text-accent"
-                          )}
-                        >
+                        <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
                           {badge}
                         </span>
                       ) : null}
@@ -125,18 +124,33 @@ export function AdminShell({
         ))}
       </nav>
 
-      <div className="border-t px-3 py-3">
-        <p className="truncate text-sm font-medium">{user.name}</p>
-        <p className="truncate text-[11px] text-muted-foreground">
-          {user.role.replace(/_/g, " ").toLowerCase()} · {scope}
-        </p>
-        <button
-          type="button"
-          onClick={signOut}
-          className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+      <div className="border-t border-white/[0.06] p-3">
+        <Link
+          href="/chat"
+          target="_blank"
+          className="mb-2 flex items-center justify-between rounded-xl px-3 py-2 text-[12px] font-medium text-white/60 transition hover:bg-white/[0.04] hover:text-white"
         >
-          <LogOut className="size-3.5" /> Sign out
-        </button>
+          Open the live assistant
+          <ExternalLink className="size-3.5" />
+        </Link>
+        <div className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand text-xs font-bold text-white">
+            {initials || "B"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{user.name}</p>
+            <p className="truncate text-[11px] text-white/45">{humanise(user.role)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={signOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="grid size-8 place-items-center rounded-lg text-white/50 transition hover:bg-white/5 hover:text-rose-300"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -144,7 +158,7 @@ export function AdminShell({
   return (
     <div className="flex min-h-dvh bg-background">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r bg-card lg:block">
+      <aside className="hidden w-[17rem] shrink-0 lg:block">
         <div className="sticky top-0 h-dvh">{sidebar}</div>
       </aside>
 
@@ -152,40 +166,32 @@ export function AdminShell({
       {open && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-foreground/40 lg:hidden"
+            className="fixed inset-0 z-40 bg-brand-ink/60 backdrop-blur-sm lg:hidden"
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r bg-card shadow-glow lg:hidden">
+          <aside className="fixed inset-y-0 left-0 z-50 w-[17rem] shadow-elevated lg:hidden">
             {sidebar}
           </aside>
         </>
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4 lg:hidden">
+        <header className="dark sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-white/[0.06] bg-brand-ink/95 px-4 backdrop-blur lg:hidden">
           <button
             type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-label={open ? "Close navigation" : "Open navigation"}
-            className="grid size-9 place-items-center rounded-xl hover:bg-secondary"
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+            className="grid size-9 place-items-center rounded-xl text-white hover:bg-white/5"
           >
-            {open ? <Menu className="size-5" /> : <Menu className="size-5" />}
+            <Menu className="size-5" />
           </button>
-          <span className="text-sm font-semibold">{BRANDING.product.shortName}</span>
-          {open && (
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close navigation"
-              className="ml-auto grid size-9 place-items-center rounded-xl hover:bg-secondary"
-            >
-              <X className="size-5" />
-            </button>
-          )}
+          <Logo href="/admin" size="sm" />
         </header>
 
-        <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-10">
+          <div className="mx-auto max-w-[1400px]">{children}</div>
+        </main>
       </div>
     </div>
   );

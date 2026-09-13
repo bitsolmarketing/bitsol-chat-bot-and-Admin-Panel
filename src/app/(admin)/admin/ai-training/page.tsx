@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import { Callout, DbNotice, PageHeader, StatCard } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
-import { BookOpen, MessageCircleQuestion, Sparkles, TriangleAlert } from "lucide-react";
-import { BRANDS, type Department } from "@/lib/brands";
+import {
+  BookOpen,
+  MessageCircleQuestion,
+  MessagesSquare,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react";
 import { config } from "@/lib/config";
 import { formatDateTime, truncate } from "@/lib/utils";
 
@@ -19,38 +24,30 @@ export const metadata = { title: "AI Training" };
  * queries are the highest-value edits to make next.
  */
 export default async function AiTrainingPage() {
-  const session = await requireAdmin("/admin/ai-training");
-  const scoped = sessionDepartment(session) as Department | null;
+  await requireAdmin("/admin/ai-training");
 
   const { data, error } = await safeQuery(
     async () => {
-      const [marketingCount, instituteCount, handoffs, recentQuestions] = await Promise.all([
+      const [knowledgeCount, questionCount, handoffs, recentQuestions] = await Promise.all([
         prisma.marketingKnowledge.count({ where: { state: "PUBLISHED" } }),
-        prisma.instituteKnowledge.count({ where: { state: "PUBLISHED" } }),
-        prisma.conversation.count({
-          where: { handedOff: true, ...(scoped ? { department: scoped } : {}) },
-        }),
+        prisma.message.count({ where: { role: "USER", ...OWN_OR_GLOBAL } }),
+        prisma.conversation.count({ where: { handedOff: true, ...OWN_OR_GLOBAL } }),
         prisma.message.findMany({
-          where: { role: "USER", ...(scoped ? { department: scoped } : {}) },
+          where: { role: "USER", ...OWN_OR_GLOBAL },
           orderBy: { createdAt: "desc" },
           take: 25,
-          select: {
-            id: true,
-            content: true,
-            department: true,
-            language: true,
-            createdAt: true,
-          },
+          select: { id: true, content: true, language: true, createdAt: true },
         }),
       ]);
-      return { marketingCount, instituteCount, handoffs, recentQuestions };
+      return { knowledgeCount, questionCount, handoffs, recentQuestions };
     },
-    { marketingCount: 0, instituteCount: 0, handoffs: 0, recentQuestions: [] }
+    { knowledgeCount: 0, questionCount: 0, handoffs: 0, recentQuestions: [] }
   );
 
   return (
     <>
       <PageHeader
+        eyebrow="Content"
         title="AI Training"
         description="What the assistant knows, which provider it's running on, and the real questions people are asking."
       />
@@ -59,20 +56,18 @@ export default async function AiTrainingPage() {
 
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Marketing entries"
-          value={data.marketingCount}
+          label="Knowledge entries"
+          value={data.knowledgeCount}
           hint="Published and indexed"
           icon={BookOpen}
-          department="MARKETING"
-          href="/admin/knowledge?department=MARKETING"
+          href="/admin/knowledge"
         />
         <StatCard
-          label="Institute entries"
-          value={data.instituteCount}
-          hint="Published and indexed"
-          icon={BookOpen}
-          department="INSTITUTE"
-          href="/admin/knowledge?department=INSTITUTE"
+          label="Questions asked"
+          value={data.questionCount}
+          hint="Across web chat and WhatsApp"
+          icon={MessagesSquare}
+          href="/admin/conversations"
         />
         <StatCard
           label="Handed off"
@@ -86,7 +81,7 @@ export default async function AiTrainingPage() {
 
       <Callout title="How training works here">
         The assistant is grounded, not fine-tuned. It answers from published knowledge-base
-        entries for the routed business, and is instructed to say it isn't sure — and offer a
+        entries, and is instructed to say it isn't sure — and offer a
         human — when nothing matches. To improve an answer, edit the entry; the change takes
         effect on the next message. No retraining run is required.
       </Callout>
@@ -103,10 +98,7 @@ export default async function AiTrainingPage() {
                 <li key={question.id} className="border-l-2 border-secondary pl-3">
                   <p className="text-sm">{truncate(question.content, 150)}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {question.department
-                      ? BRANDS[question.department].shortName
-                      : "Not routed"}{" "}
-                    · {question.language ?? "EN"} · {formatDateTime(question.createdAt)}
+                    {question.language ?? "EN"} · {formatDateTime(question.createdAt)}
                   </p>
                 </li>
               ))}

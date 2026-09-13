@@ -33,8 +33,8 @@ Set production values in `.env`:
   rate limiting fails open and allows every request
 - `JWT_SECRET` = `openssl rand -base64 48`
 - `AI_PROVIDER` + the matching API key and `AI_MODEL`
-- `SALES_NOTIFY_EMAIL` and `ADMISSIONS_NOTIFY_EMAIL` — where new BITSOL
-  Marketing leads and BITSOL Institute admission inquiries are announced
+- `SALES_NOTIFY_EMAIL` — where new leads, meetings, tickets and handoffs are
+  announced
 - `SEED_ADMIN_PASSWORD` / `SEED_STAFF_PASSWORD` — **change these before seeding**
 
 Keep `.env` out of version control (already in `.gitignore`).
@@ -60,8 +60,9 @@ docker compose up -d --build web
 docker compose exec web npx prisma migrate deploy
 ```
 
-The seed is idempotent, so re-running it after editing the service or course
-catalogues in `src/data` pushes those changes into the database.
+The seed is idempotent, so re-running it after editing the service catalogue
+in `src/data` pushes those changes into the database. It never deletes: records
+left from BITSOL Institute stay in the database, hidden from the app.
 
 ---
 
@@ -326,33 +327,31 @@ repository secrets — never in the workflow file.
 - [ ] Review service pricing in `src/data/marketing/services.ts`. Every figure
       ships as a clearly-labelled placeholder; the assistant presents them as
       indicative and offers a written quotation, but they should still be real.
-- [ ] Review course fees and instalment plans in `src/data/institute/courses.ts`.
-- [ ] Update phone, WhatsApp, email, address and office hours for **both**
-      businesses in `src/lib/brands.ts`. The assistant is instructed never to
-      give contact details beyond these values.
+- [ ] Update phone, WhatsApp, email, address and office hours in
+      `src/lib/brands.ts`. The assistant is instructed never to give contact
+      details beyond these values.
 - [ ] Re-run `npm run db:seed` to push the changes into the database.
-- [ ] Walk the Knowledge Base module (`/admin/knowledge`) for each business and
-      confirm every entry is accurate and `PUBLISHED`.
+- [ ] Walk the Knowledge Base module (`/admin/knowledge`) and confirm every
+      entry is accurate and `PUBLISHED`.
 
 **Security**
 
 - [ ] `JWT_SECRET` is a fresh 48-byte random string.
-- [ ] Seeded accounts (`admin@bitsol.local`, `sales@bitsol.local`,
-      `admissions@bitsol.local`) have had their passwords changed, or been
-      replaced with real staff accounts.
-- [ ] Staff who work on only one business have `department` set, so they cannot
-      read the other pipeline.
+- [ ] Seeded accounts (`admin@bitsol.local`, `sales@bitsol.local`) have had
+      their passwords changed, or been replaced with real staff accounts.
+- [ ] Anyone still needing the console has a Marketing or unscoped account —
+      former BITSOL Institute accounts are refused at sign-in.
 - [ ] `REDIS_URL` is configured so rate limiting is actually enforced.
 - [ ] TLS is live and HTTP redirects to HTTPS.
 
 **Smoke test**
 
-- [ ] `/chat` → the welcome screen offers both businesses.
-- [ ] Ask a Marketing question → the UI turns blue, answers from Marketing content.
-- [ ] Ask an Institute question → the UI turns emerald, answers from course content.
-- [ ] Say "I want a course for my company" → the assistant asks which business.
-- [ ] Submit a quote request and an admission inquiry; confirm both references
-      appear in `/admin/crm/leads` and `/admin/crm/admissions`.
+- [ ] `/chat` → the welcome screen shows the suggestions and the service rail.
+- [ ] Ask about a service → the answer comes from Marketing content with an
+      indicative price.
+- [ ] Ask about individual courses or admissions → the assistant says they
+      aren't offered and points to Corporate Training, without inventing details.
+- [ ] Submit a quote request; confirm the reference appears in `/admin/crm/leads`.
 - [ ] Ask to "talk to a human"; confirm a ticket appears in `/admin/support/tickets`.
 - [ ] `curl https://your-domain/api/health` returns `"status":"healthy"`.
 

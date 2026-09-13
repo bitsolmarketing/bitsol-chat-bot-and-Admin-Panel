@@ -1,7 +1,6 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import { Callout, DbNotice, PageHeader, StatusBadge } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 import { MARKETING_SERVICES } from "@/data/marketing/services";
@@ -9,8 +8,7 @@ import { MARKETING_SERVICES } from "@/data/marketing/services";
 export const metadata = { title: "Services" };
 
 export default async function ServicesPage() {
-  const session = await requireAdmin("/admin/catalogue/services");
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/catalogue/services");
 
   // The database is the live source; the file catalogue is the fallback so the
   // page is still useful before the first `db:seed`.
@@ -50,9 +48,9 @@ export default async function ServicesPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Practice"
         title="Services"
-        department="MARKETING"
-        description="The BITSOL Marketing service catalogue the assistant answers from. Edits here change what customers are told."
+        description="The service catalogue the assistant answers from. Edits here change what clients are told."
       />
 
       {error && <DbNotice error={error} />}
@@ -73,7 +71,7 @@ export default async function ServicesPage() {
               {services
                 .filter((service) => service.group === group)
                 .map((service) => (
-                  <Card key={service.slug} data-department="MARKETING" className="flex flex-col p-4">
+                  <Card key={service.slug} className="flex flex-col p-4">
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <h3 className="text-sm font-semibold">{service.name}</h3>
                       <StatusBadge value={service.isActive ? "PUBLISHED" : "ARCHIVED"} />

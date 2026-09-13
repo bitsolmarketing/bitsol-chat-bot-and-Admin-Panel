@@ -1,13 +1,11 @@
 import type { Language } from "@/lib/i18n";
-import type { Department } from "@/lib/brands";
 import type { ListRow, ReplyButton } from "./types";
 import { toDisplayPhone } from "./client";
 import { MARKETING_SERVICES, MARKETING_SERVICE_GROUPS } from "@/data/marketing/services";
-import { INSTITUTE_COURSES, COURSE_GROUPS } from "@/data/institute/courses";
 
 /**
  * =============================================================================
- *  WhatsApp lead & admission capture
+ *  WhatsApp lead capture
  * =============================================================================
  *
  *  The web widget can open a form and collect eight fields in one screen.
@@ -29,7 +27,12 @@ import { INSTITUTE_COURSES, COURSE_GROUPS } from "@/data/institute/courses";
  * =============================================================================
  */
 
-export type CaptureFlow = "LEAD" | "ADMISSION";
+/**
+ * Which structured capture is running. Only leads today; the flow is still
+ * stored with the state so another one can be added without migrating the
+ * captures already in progress.
+ */
+export type CaptureFlow = "LEAD";
 
 export interface CaptureState {
   flow: CaptureFlow;
@@ -286,125 +289,9 @@ const LEAD_STEPS: CaptureStep[] = [
   },
 ];
 
-// ---------------------------------------------------------- ADMISSION flow --
-
-const ADMISSION_STEPS: CaptureStep[] = [
-  {
-    key: "studentName",
-    prompt: {
-      en: "Wonderful — let's register your admission inquiry. 🎓\n\nWhat is the student's full name?",
-      ur: "بہت خوب — آئیے آپ کی داخلہ درخواست درج کرتے ہیں۔ 🎓\n\nطالبِ علم کا پورا نام؟",
-      ur_roman:
-        "Bohat acha — chalein aap ki admission inquiry register karte hain. 🎓\n\nStudent ka poora naam?",
-      pa: "بہت ودھیا — آؤ تہاڈی داخلے دی درخواست لکھیے۔ 🎓\n\nودیارتھی دا پورا ناں؟",
-    },
-    clean: cleanName,
-    error: NAME_ERROR,
-  },
-  {
-    key: "phone",
-    prompt: PHONE_STEP_PROMPT,
-    buttons: (_answers, language) => [
-      { id: `${OPTION_PREFIX}use_wa_number`, title: USE_THIS_NUMBER[language] },
-    ],
-    clean: cleanPhone,
-    error: PHONE_ERROR,
-  },
-  {
-    key: "city",
-    prompt: {
-      en: "🏙️ Which city are you in?",
-      ur: "🏙️ آپ کس شہر میں ہیں؟",
-      ur_roman: "🏙️ Aap kis sheher mein hain?",
-      pa: "🏙️ تسی کیہڑے شہر وچ او؟",
-    },
-    optional: true,
-  },
-  {
-    key: "qualification",
-    prompt: {
-      en: "🎓 What is your latest qualification?",
-      ur: "🎓 آپ کی آخری تعلیم کیا ہے؟",
-      ur_roman: "🎓 Aap ki aakhri taleem kya hai?",
-      pa: "🎓 تہاڈی چھیکڑلی پڑھائی کیہ اے؟",
-    },
-    list: (_answers, language) => ({
-      label: CHOOSE[language],
-      rows: [
-        { id: `${OPTION_PREFIX}Matric`, title: "Matric" },
-        { id: `${OPTION_PREFIX}Intermediate / FSc`, title: "Intermediate / FSc" },
-        { id: `${OPTION_PREFIX}Bachelor's`, title: "Bachelor's" },
-        { id: `${OPTION_PREFIX}Master's`, title: "Master's" },
-        { id: `${OPTION_PREFIX}Other`, title: SOMETHING_ELSE[language] },
-      ],
-    }),
-  },
-  catalogueGroupStep("courseGroup", {
-    en: "Which field do you want to learn?",
-    ur: "آپ کون سا شعبہ سیکھنا چاہتے ہیں؟",
-    ur_roman: "Aap kaun sa field seekhna chahte hain?",
-    pa: "تسی کیہڑا شعبہ سِکھنا چاہندے او؟",
-  }, COURSE_GROUPS),
-  {
-    key: "course",
-    prompt: {
-      en: "Which course specifically?",
-      ur: "خاص طور پر کون سا کورس؟",
-      ur_roman: "Khaas taur par kaun sa course?",
-      pa: "خاص کر کے کیہڑا کورس؟",
-    },
-    skipWhen: (answers) => answers.courseGroup === OTHER_GROUP,
-    list: (answers, language) => ({
-      label: CHOOSE[language],
-      rows: INSTITUTE_COURSES.filter((course) => course.group === answers.courseGroup)
-        .slice(0, 9)
-        .map((course) => ({
-          id: `${OPTION_PREFIX}${course.slug}`,
-          title: course.name,
-          description: course.duration,
-        }))
-        .concat({
-          id: `${OPTION_PREFIX}${OTHER_GROUP}`,
-          title: SOMETHING_ELSE[language],
-          description: "",
-        }),
-    }),
-  },
-  {
-    key: "preferredBatch",
-    prompt: {
-      en: "🕒 Which timing suits you best?",
-      ur: "🕒 آپ کے لیے کون سا وقت مناسب ہے؟",
-      ur_roman: "🕒 Aap ke liye kaun sa time theek rahega?",
-      pa: "🕒 تہاڈے لئی کیہڑا ویلا ٹھیک اے؟",
-    },
-    buttons: (_answers, language) => [
-      { id: `${OPTION_PREFIX}Morning`, title: morning(language) },
-      { id: `${OPTION_PREFIX}Evening`, title: evening(language) },
-      { id: `${OPTION_PREFIX}Weekend`, title: weekend(language) },
-    ],
-  },
-  {
-    key: "notes",
-    prompt: {
-      en: "Anything else the admissions officer should know before they call?",
-      ur: "کال سے پہلے داخلہ آفیسر کو اور کچھ بتانا چاہیں گے؟",
-      ur_roman: "Call se pehle admission officer ko aur kuch batana chahenge?",
-      pa: "کال توں پہلاں داخلہ افسر نوں ہور کجھ دسنا چاہوگے؟",
-    },
-    optional: true,
-  },
-];
-
 const FLOWS: Record<CaptureFlow, CaptureStep[]> = {
   LEAD: LEAD_STEPS,
-  ADMISSION: ADMISSION_STEPS,
 };
-
-/** The flow a department captures into. */
-export function flowFor(department: Department): CaptureFlow {
-  return department === "MARKETING" ? "LEAD" : "ADMISSION";
-}
 
 // ------------------------------------------------------- State transitions --
 
@@ -495,7 +382,7 @@ function askFrom(state: CaptureState, language: Language, from: number): Capture
   for (let index = from; index < steps.length; index++) {
     const step = steps[index];
     // Already answered — either seeded from the conversation ("you were asking
-    // about the SEO course") or filled on an earlier pass. Never ask twice.
+    // about SEO") or filled on an earlier pass. Never ask twice.
     if (state.answers[step.key] !== undefined) continue;
     if (step.skipWhen?.(state.answers)) continue;
     const positioned: CaptureState = { ...state, step: index };
@@ -537,7 +424,8 @@ export function isCaptureStale(state: CaptureState): boolean {
 export function asCaptureState(value: unknown): CaptureState | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<CaptureState>;
-  if (candidate.flow !== "LEAD" && candidate.flow !== "ADMISSION") return null;
+  // An admission capture left over from BITSOL Institute is not resumable.
+  if (candidate.flow !== "LEAD") return null;
   if (typeof candidate.step !== "number") return null;
   return {
     flow: candidate.flow,
@@ -568,16 +456,6 @@ function withinMonth(language: Language): string {
 function justExploring(language: Language): string {
   return { en: "Just exploring", ur: "صرف معلومات", ur_roman: "Sirf maloomat", pa: "صرف جاݨکاری" }[language];
 }
-function morning(language: Language): string {
-  return { en: "Morning", ur: "صبح", ur_roman: "Morning", pa: "سویرے" }[language];
-}
-function evening(language: Language): string {
-  return { en: "Evening", ur: "شام", ur_roman: "Evening", pa: "شام" }[language];
-}
-function weekend(language: Language): string {
-  return { en: "Weekend", ur: "ہفتہ اتوار", ur_roman: "Weekend", pa: "ہفتہ اتوار" }[language];
-}
-
 const CANCEL_WORDS = [
   "cancel", "stop", "exit", "quit", "menu", "back", "main menu", "restart",
   "band karo", "rehne do", "منسوخ", "بند",

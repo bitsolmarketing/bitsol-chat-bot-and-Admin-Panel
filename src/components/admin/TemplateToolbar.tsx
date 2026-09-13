@@ -6,7 +6,6 @@ import { Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, Textarea } from "@/components/ui/field";
-import type { Department } from "@/lib/brands";
 
 /**
  * Sync templates from Meta, and submit new ones for approval.
@@ -54,12 +53,9 @@ function countPlaceholders(text: string): number {
 
 export function TemplateToolbar({
   canSync,
-  department,
 }: {
   /** False when WHATSAPP_WABA_ID is unset — Meta cannot be reached either way. */
   canSync: boolean;
-  /** The session's business, or null for staff who can publish for both. */
-  department: Department | null;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -73,7 +69,6 @@ export function TemplateToolbar({
   const [form, setForm] = useState({
     name: "",
     metaName: "",
-    department: department ?? ("MARKETING" as Department),
     languageCode: "en",
     category: "UTILITY" as (typeof CATEGORIES)[number]["value"],
     headerText: "",
@@ -143,7 +138,7 @@ export function TemplateToolbar({
     }
   }
 
-  /** `Fee reminder` → `fee_reminder`, the only shape Meta accepts. */
+  /** `Consultation reminder` → `consultation_reminder`, the only shape Meta accepts. */
   function suggestMetaName(display: string): string {
     return display
       .toLowerCase()
@@ -212,7 +207,7 @@ export function TemplateToolbar({
                         : current.metaName,
                   }));
                 }}
-                placeholder="Fee instalment reminder"
+                placeholder="Consultation reminder"
                 required
               />
             </Field>
@@ -228,25 +223,9 @@ export function TemplateToolbar({
                   setForm((current) => ({ ...current, metaName: e.target.value }))
                 }
                 pattern="[a-z0-9_]+"
-                placeholder="fee_instalment_reminder"
+                placeholder="consultation_reminder"
                 required
               />
-            </Field>
-
-            <Field label="Business" required>
-              <Select
-                value={form.department}
-                onChange={(e) =>
-                  setForm((current) => ({
-                    ...current,
-                    department: e.target.value as Department,
-                  }))
-                }
-                disabled={Boolean(department)}
-              >
-                <option value="MARKETING">BITSOL Marketing</option>
-                <option value="INSTITUTE">BITSOL Institute</option>
-              </Select>
             </Field>
 
             <Field label="Language" required>
@@ -263,29 +242,29 @@ export function TemplateToolbar({
                 ))}
               </Select>
             </Field>
-          </div>
 
-          <Field
-            label="Category"
-            required
-            hint={CATEGORIES.find((c) => c.value === form.category)?.hint}
-          >
-            <Select
-              value={form.category}
-              onChange={(e) =>
-                setForm((current) => ({
-                  ...current,
-                  category: e.target.value as typeof current.category,
-                }))
-              }
+            <Field
+              label="Category"
+              required
+              hint={CATEGORIES.find((c) => c.value === form.category)?.hint}
             >
-              {CATEGORIES.map((category) => (
-                <option key={category.value} value={category.value}>
-                  {category.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+              <Select
+                value={form.category}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    category: e.target.value as typeof current.category,
+                  }))
+                }
+              >
+                {CATEGORIES.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
 
           <Field label="Header" hint="Optional, one line, max 60 characters.">
             <Input
@@ -294,7 +273,7 @@ export function TemplateToolbar({
                 setForm((current) => ({ ...current, headerText: e.target.value }))
               }
               maxLength={60}
-              placeholder="BITSOL Institute"
+              placeholder="BITSOL Marketing"
             />
           </Field>
 
@@ -307,7 +286,7 @@ export function TemplateToolbar({
               value={form.body}
               onChange={(e) => setForm((current) => ({ ...current, body: e.target.value }))}
               maxLength={1024}
-              placeholder="Hi {{1}}, your next fee instalment of {{2}} is due on {{3}}."
+              placeholder="Hi {{1}}, your consultation with our team is confirmed for {{2}} at {{3}}."
               required
             />
           </Field>

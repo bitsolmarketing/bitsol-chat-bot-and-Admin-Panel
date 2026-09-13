@@ -1,7 +1,6 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import { DataTable, DbNotice, PageHeader, StatCard, StatusBadge } from "@/components/admin/ui";
 import { FolderKanban, Truck, Wallet } from "lucide-react";
 import { formatDate, formatPkr, truncate } from "@/lib/utils";
@@ -9,8 +8,7 @@ import { formatDate, formatPkr, truncate } from "@/lib/utils";
 export const metadata = { title: "Projects" };
 
 export default async function ProjectsPage() {
-  const session = await requireAdmin("/admin/catalogue/projects");
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/catalogue/projects");
 
   const { data, error } = await safeQuery(
     async () => {
@@ -37,21 +35,20 @@ export default async function ProjectsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Practice"
         title="Projects"
-        department="MARKETING"
         description="Delivery pipeline for won work — what's in discovery, in build, in review and shipped."
       />
 
       {error && <DbNotice error={error} />}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <StatCard label="In flight" value={data.inFlight} icon={FolderKanban} department="MARKETING" />
-        <StatCard label="Delivered" value={data.delivered} icon={Truck} department="MARKETING" />
+        <StatCard label="In flight" value={data.inFlight} icon={FolderKanban} />
+        <StatCard label="Delivered" value={data.delivered} icon={Truck} />
         <StatCard
           label="Total contracted"
           value={formatPkr(data.value)}
           icon={Wallet}
-          department="MARKETING"
         />
       </div>
 

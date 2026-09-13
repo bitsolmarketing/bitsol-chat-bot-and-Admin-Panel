@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Megaphone, Upload, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, Textarea } from "@/components/ui/field";
-import type { Department } from "@/lib/brands";
 
 /**
  * =============================================================================
@@ -36,7 +35,6 @@ export interface ComposerTemplate {
   headerFormat: string | null;
   footerText: string | null;
   variables: string[];
-  department: Department | null;
 }
 
 type ParameterKind = "contactName" | "static" | "contactPhone";
@@ -86,11 +84,9 @@ function render(body: string, values: string[]): string {
 
 export function BroadcastComposer({
   templates,
-  department,
 }: {
   /** Approved templates only — nothing else can be broadcast. */
   templates: ComposerTemplate[];
-  department: Department | null;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -101,7 +97,6 @@ export function BroadcastComposer({
   const [notice, setNotice] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [business, setBusiness] = useState<Department>(department ?? "MARKETING");
   const [templateId, setTemplateId] = useState("");
   const [parameters, setParameters] = useState<ParameterDraft[]>([]);
   const [headerMediaUrl, setHeaderMediaUrl] = useState("");
@@ -116,14 +111,7 @@ export function BroadcastComposer({
   const [reach, setReach] = useState<number | null>(null);
   const [counting, setCounting] = useState(false);
 
-  // A template assigned to the other business would be refused by the server;
-  // hiding it here means the picker never offers a dead end.
-  const available = useMemo(
-    () => templates.filter((t) => !t.department || t.department === business),
-    [templates, business]
-  );
-
-  const template = available.find((t) => t.id === templateId) ?? null;
+  const template = templates.find((t) => t.id === templateId) ?? null;
   const placeholders = template ? countPlaceholders(template.body) : 0;
   const needsMedia = Boolean(
     template?.headerFormat && MEDIA_HEADERS.has(template.headerFormat.toUpperCase())
@@ -141,11 +129,6 @@ export function BroadcastComposer({
     );
   }, [placeholders, templateId]);
 
-  // Clear a selection that the business switch just made invalid.
-  useEffect(() => {
-    if (templateId && !available.some((t) => t.id === templateId)) setTemplateId("");
-  }, [available, templateId]);
-
   // Live audience count for a segment. Debounced because the day and limit
   // fields fire on every keystroke, and each change is a database count.
   useEffect(() => {
@@ -159,7 +142,6 @@ export function BroadcastComposer({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            department: business,
             includeUnrouted,
             activeWithinDays: activeWithinDays ? Number(activeWithinDays) : null,
             limit: limit ? Number(limit) : null,
@@ -178,7 +160,7 @@ export function BroadcastComposer({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, audienceKind, business, includeUnrouted, activeWithinDays, limit]);
+  }, [open, audienceKind, includeUnrouted, activeWithinDays, limit]);
 
   // The same parse the create endpoint will run, so what the report says is
   // what will happen. Debounced harder than the segment count: this one is
@@ -248,7 +230,6 @@ export function BroadcastComposer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          department: business,
           templateId: template.id,
           headerMediaUrl: needsMedia ? headerMediaUrl.trim() : undefined,
           parameters: parameters.map((parameter) =>
@@ -327,33 +308,22 @@ export function BroadcastComposer({
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="March intake — fee reminder"
+            placeholder="Q3 — WhatsApp automation launch offer"
             required
           />
         </Field>
 
-        <Field label="Business" required>
-          <Select
-            value={business}
-            onChange={(e) => setBusiness(e.target.value as Department)}
-            disabled={Boolean(department)}
-          >
-            <option value="MARKETING">BITSOL Marketing</option>
-            <option value="INSTITUTE">BITSOL Institute</option>
+        <Field label="Approved template" required>
+          <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} required>
+            <option value="">Choose a template…</option>
+            {templates.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name} ({option.languageCode})
+              </option>
+            ))}
           </Select>
         </Field>
       </div>
-
-      <Field label="Approved template" required>
-        <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)} required>
-          <option value="">Choose a template…</option>
-          {available.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} ({option.languageCode})
-            </option>
-          ))}
-        </Select>
-      </Field>
 
       {template && (
         <>
@@ -494,7 +464,7 @@ export function BroadcastComposer({
                 onChange={(e) => setIncludeUnrouted(e.target.checked)}
                 className="size-3.5 accent-[hsl(var(--primary))]"
               />
-              Also include contacts who have not been routed to a business yet
+              Also include older contacts who never chose a business in the previous welcome menu
             </label>
 
             <div className="grid gap-2 sm:grid-cols-2">

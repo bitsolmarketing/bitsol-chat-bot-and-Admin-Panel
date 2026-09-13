@@ -1,12 +1,11 @@
-import Link from "next/link";
 import type { TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
+  FilterChip,
   PageHeader,
   StatCard,
   StatusBadge,
@@ -27,7 +26,7 @@ export default async function TicketsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const session = await requireAdmin("/admin/support/tickets");
+  await requireAdmin("/admin/support/tickets");
   const { status } = await searchParams;
   const active = STATUSES.includes(status as TicketStatus)
     ? (status as TicketStatus)
@@ -35,7 +34,7 @@ export default async function TicketsPage({
 
   const { data, error } = await safeQuery(
     async () => {
-      const where = { ...scope(session), ...(active ? { status: active } : {}) };
+      const where = { ...OWN, ...(active ? { status: active } : {}) };
       const [tickets, counts, urgent] = await Promise.all([
         prisma.ticket.findMany({
           where,
@@ -46,11 +45,11 @@ export default async function TicketsPage({
         prisma.ticket.groupBy({
           by: ["status"],
           _count: { _all: true },
-          where: scope(session),
+          where: OWN,
         }),
         prisma.ticket.count({
           where: {
-            ...scope(session),
+            ...OWN,
             priority: { in: ["HIGH", "URGENT"] },
             status: { in: ["OPEN", "IN_PROGRESS"] },
           },
@@ -72,8 +71,9 @@ export default async function TicketsPage({
   return (
     <>
       <PageHeader
+        eyebrow="Support"
         title="Support Tickets"
-        description="Technical, billing, sales, complaint and general enquiries from both businesses — every one with a reference the customer already has."
+        description="Technical, billing, sales, complaint and general enquiries — every one with a reference the client already has."
       />
 
       {error && <DbNotice error={error} />}
@@ -109,10 +109,6 @@ export default async function TicketsPage({
           {
             header: "Reference",
             cell: (row) => <span className="font-mono text-xs">{row.reference}</span>,
-          },
-          {
-            header: "Business",
-            cell: (row) => <DepartmentTag department={row.department} />,
           },
           {
             header: "Subject",
@@ -179,33 +175,5 @@ export default async function TicketsPage({
         ]}
       />
     </>
-  );
-}
-
-function FilterChip({
-  href,
-  label,
-  count,
-  active,
-}: {
-  href: string;
-  label: string;
-  count: number;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-        active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "bg-card hover:bg-secondary"
-      }`}
-    >
-      {label}
-      <span className={active ? "ml-1.5 opacity-80" : "ml-1.5 text-muted-foreground"}>
-        {count}
-      </span>
-    </Link>
   );
 }

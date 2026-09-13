@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { ChannelBadge, DepartmentTag, PageHeader } from "@/components/admin/ui";
+import { ChannelBadge, PageHeader } from "@/components/admin/ui";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery } from "@/lib/admin/queries";
-import { canAccessDepartment } from "@/lib/auth";
+import { isOwn, safeQuery } from "@/lib/admin/queries";
 import { cn, formatDateTime, isUrduScript } from "@/lib/utils";
 
 export const metadata = { title: "Conversation" };
@@ -16,7 +15,7 @@ export default async function ConversationDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireAdmin();
+  await requireAdmin();
   const { id } = await params;
 
   const { data: conversation } = await safeQuery(
@@ -27,17 +26,13 @@ export default async function ConversationDetailPage({
           messages: { orderBy: { createdAt: "asc" } },
           tickets: { select: { reference: true, status: true } },
           leads: { select: { id: true, reference: true } },
-          admissions: { select: { id: true, reference: true } },
         },
       }),
     null
   );
 
-  if (!conversation) notFound();
-  // A conversation belongs to one business; scoped staff can't read the other's.
-  if (conversation.department && !canAccessDepartment(session, conversation.department)) {
-    notFound();
-  }
+  // An archived Institute conversation is not part of this console.
+  if (!conversation || !isOwn(conversation.department)) notFound();
 
   return (
     <>
@@ -53,21 +48,11 @@ export default async function ConversationDetailPage({
         description={`${conversation.messages.length} messages · started ${formatDateTime(
           conversation.createdAt
         )} · language ${conversation.language}`}
-        actions={
-          <div className="flex items-center gap-2">
-            <ChannelBadge value={conversation.channel} />
-            {conversation.department && (
-              <DepartmentTag department={conversation.department} />
-            )}
-          </div>
-        }
+        actions={<ChannelBadge value={conversation.channel} />}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card
-          data-department={conversation.department ?? undefined}
-          className="scroll-slim max-h-[70dvh] space-y-4 overflow-y-auto p-5 lg:col-span-2"
-        >
+        <Card className="scroll-slim max-h-[70dvh] space-y-4 overflow-y-auto p-5 lg:col-span-2">
           {conversation.messages.map((message) => {
             const isUser = message.role === "USER";
             return (
@@ -153,28 +138,15 @@ export default async function ConversationDetailPage({
                   <span className="text-muted-foreground">lead</span>
                 </li>
               ))}
-              {conversation.admissions.map((admission) => (
-                <li key={admission.id}>
-                  <Link
-                    href={`/admin/crm/admissions/${admission.id}`}
-                    className="font-mono text-primary hover:underline"
-                  >
-                    {admission.reference}
-                  </Link>{" "}
-                  <span className="text-muted-foreground">admission</span>
-                </li>
-              ))}
               {conversation.tickets.map((ticket) => (
                 <li key={ticket.reference} className="text-muted-foreground">
                   <span className="font-mono text-foreground">{ticket.reference}</span> ticket ·{" "}
                   {ticket.status}
                 </li>
               ))}
-              {!conversation.leads.length &&
-                !conversation.admissions.length &&
-                !conversation.tickets.length && (
-                  <li className="text-muted-foreground">Nothing captured from this chat.</li>
-                )}
+              {!conversation.leads.length && !conversation.tickets.length && (
+                <li className="text-muted-foreground">Nothing captured from this chat.</li>
+              )}
             </ul>
           </Card>
         </div>

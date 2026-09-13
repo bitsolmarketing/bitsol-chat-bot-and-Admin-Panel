@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * Minimal form primitives matching the Input/Card style, used by the in-chat
- * workflow forms (lead capture, admission inquiry, meeting booking, support)
- * and the admin console. Deliberately unstyled beyond the shared tokens so both
- * surfaces inherit whichever department theme is in scope.
+ * workflow forms (lead capture, meeting booking, support) and the admin
+ * console. Deliberately unstyled beyond the shared tokens so they sit equally
+ * well on the light admin workspace and the midnight chat surface.
  */
 
 const Textarea = React.forwardRef<

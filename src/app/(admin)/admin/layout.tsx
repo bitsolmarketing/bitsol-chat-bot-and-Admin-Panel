@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { requireAdmin } from "@/lib/session";
-import { loadPermissions, navCounts, sessionDepartment } from "@/lib/admin/queries";
-import type { Department } from "@/lib/brands";
+import { loadPermissions, navCounts } from "@/lib/admin/queries";
 
 export const metadata: Metadata = {
   title: { default: "Admin", template: "%s · BITSOL Admin" },
@@ -22,18 +21,12 @@ export default async function AdminLayout({
 
   const [permissions, badges] = await Promise.all([
     loadPermissions(session),
-    navCounts(session),
+    navCounts(),
   ]);
-
-  const department = sessionDepartment(session);
 
   return (
     <AdminShell
-      user={{
-        name: session.name,
-        role: session.role,
-        department: department as Department | null,
-      }}
+      user={{ name: session.name, role: session.role }}
       // Only serializable values cross into the client component — the nav
       // tree is built there, since each item carries a Lucide icon function.
       permissions={permissions ? [...permissions] : null}

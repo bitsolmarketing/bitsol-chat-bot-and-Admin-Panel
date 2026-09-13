@@ -158,7 +158,7 @@ export async function sendText(to: string, text: string): Promise<SendResult> {
  * Send up to three tappable reply buttons.
  *
  * Buttons are how a WhatsApp thread gets the equivalent of the web widget's
- * department picker and quick replies — typing "1" is error-prone in four
+ * menu and quick replies — typing "1" is error-prone in four
  * languages, tapping is not.
  */
 export async function sendButtons(

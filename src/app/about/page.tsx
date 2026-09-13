@@ -1,154 +1,139 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  ArrowLeft,
+  ArrowRight,
   Bot,
-  Building2,
-  GraduationCap,
   Globe,
   Languages,
   Lock,
+  MessageCircle,
   Sparkles,
-  Workflow,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/branding/SiteHeader";
 import { Footer } from "@/components/branding/Footer";
-import { BitsolBranding } from "@/components/branding/BitsolBranding";
-import { BRANDING, brandName, brandUrl, brandTagline } from "@/lib/branding";
-import { BRANDS } from "@/lib/brands";
+import { BRANDING, brandName, brandTagline, brandUrl } from "@/lib/branding";
+import { BRAND } from "@/lib/brands";
 
 export const metadata: Metadata = {
   title: "About",
-  description:
-    "About the BITSOL AI Assistant — one assistant serving BITSOL Marketing and BITSOL Institute of Digital Media & Artificial Intelligence.",
+  description: `About ${BRAND.name} and the BITSOL AI Assistant — the AI concierge that answers, qualifies and books for the firm, 24/7.`,
 };
 
 const FEATURES = [
   {
-    icon: Workflow,
-    title: "Intelligent routing",
-    desc: "Works out whether you need BITSOL Marketing or BITSOL Institute, remembers the choice, and lets you switch whenever you like.",
-  },
-  {
-    icon: Languages,
-    title: "Four languages",
-    desc: "English, Urdu, Roman Urdu and Punjabi — with tolerance for spelling mistakes, abbreviations and mixed-language messages.",
-  },
-  {
     icon: Sparkles,
     title: "Grounded answers",
-    desc: "Replies come from an approved knowledge base per business, so service and course information is never mixed.",
-  },
-  {
-    icon: Globe,
-    title: "24/7 availability",
-    desc: "Leads, admission inquiries, bookings and support tickets are captured at 2am just as reliably as at 2pm.",
+    desc: "Replies are drawn from BITSOL Marketing's approved knowledge base first — services, process, policies and indicative pricing — never invented.",
   },
   {
     icon: Bot,
     title: "Actions, not just answers",
-    desc: "Quotes, consultations, admission inquiries and support tickets are created with real reference numbers and routed to the right team.",
+    desc: "Quote requests, consultations and support tickets are created with real reference numbers and routed straight to the team.",
+  },
+  {
+    icon: Languages,
+    title: "Four languages",
+    desc: "English, Urdu, Roman Urdu and Punjabi — tolerant of spelling mistakes, abbreviations and mixed-language messages.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Web and WhatsApp",
+    desc: "The same concierge answers on this site and on the BITSOL WhatsApp number, so the answer never depends on the channel.",
+  },
+  {
+    icon: Globe,
+    title: "Always available",
+    desc: "A lead at 2am is captured as reliably as one at 2pm, and it is waiting for the team when the office opens.",
   },
   {
     icon: Lock,
     title: "Secure by design",
-    desc: "Rate limiting, JWT sessions, role-based access, input validation and full audit logging across every module.",
+    desc: "Rate limiting, signed sessions, role-based access, validated input and a full audit trail across every module.",
   },
 ];
 
 export default function AboutPage() {
   return (
-    <main className="flex min-h-dvh flex-col">
-      <header className="glass sticky top-0 z-40">
-        <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <Bot className="size-5" />
-            </span>
-            <span className="text-sm font-bold">{BRANDING.product.name}</span>
-          </Link>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-1.5">
-              <ArrowLeft className="size-4" /> Home
-            </Button>
-          </Link>
-        </div>
-      </header>
+    <div className="dark min-h-dvh bg-background text-foreground">
+      <SiteHeader />
 
-      <section className="container max-w-3xl py-16">
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-          About the {BRANDING.product.name}
-        </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          {BRANDING.product.description} One conversation, two businesses — with a strict
-          wall between them so a customer asking about a website never gets course fees,
-          and a student asking about admissions never gets a project quotation.
-        </p>
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {[BRANDS.MARKETING, BRANDS.INSTITUTE].map((brand) => (
-            <Card key={brand.id} data-department={brand.id} className="p-5">
-              <span className="mb-3 inline-grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                {brand.id === "MARKETING" ? (
-                  <Building2 className="size-5" />
-                ) : (
-                  <GraduationCap className="size-5" />
-                )}
-              </span>
-              <h3 className="font-semibold">
-                {brand.emoji} {brand.shortName}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">{brand.description}</p>
-              <p className="mt-3 text-xs font-medium text-primary">
-                {brand.purpose.join(" · ")}
-              </p>
-            </Card>
-          ))}
-        </div>
-
-        <h2 className="mt-14 text-xl font-bold tracking-tight">What it does</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          {FEATURES.map((feature) => (
-            <Card key={feature.title} className="p-5">
-              <span className="mb-3 inline-grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
-                <feature.icon className="size-5" />
-              </span>
-              <h3 className="font-semibold">{feature.title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{feature.desc}</p>
-            </Card>
-          ))}
-        </div>
-
-        <Card className="brand-gradient mt-12 border-0 p-8 text-white">
-          <h2 className="text-xl font-bold">{BRANDING.product.poweredBy}</h2>
-          <p className="mt-2 text-white/80">{brandTagline}</p>
-          <div className="mt-5">
-            <p className="text-sm text-white/70">Designed &amp; Developed by</p>
-            <Link
-              href={brandUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-lg font-bold text-white hover:underline"
-            >
-              {brandName}
-            </Link>
+      <main>
+        <section className="brand-gradient relative overflow-hidden">
+          <div className="bg-grid pointer-events-none absolute inset-0" aria-hidden />
+          <div className="container relative max-w-4xl py-24 text-center md:py-32">
+            <p className="eyebrow justify-center">About</p>
+            <h1 className="mt-6 text-balance text-5xl font-extrabold leading-[1.05] tracking-tightest text-white md:text-6xl">
+              A firm built on AI —{" "}
+              <span className="text-gradient">with a concierge to match.</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-white/60">
+              {BRAND.description}
+            </p>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.22em] text-white/40">
+              {BRAND.purpose.join(" · ")}
+            </p>
           </div>
-          <div className="mt-6">
-            <Link href="/chat">
-              <Button className="gap-2 bg-white text-primary hover:bg-white/90">
-                <Sparkles className="size-4" /> Try the assistant
-              </Button>
-            </Link>
-          </div>
-        </Card>
+        </section>
 
-        <div className="mt-10 flex justify-center">
-          <BitsolBranding />
-        </div>
-      </section>
+        <section className="container py-24">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="eyebrow justify-center">{BRANDING.product.name}</p>
+            <h2 className="mt-5 text-balance text-4xl font-extrabold leading-tight tracking-tightest text-white">
+              What the concierge does for you
+            </h2>
+          </div>
+
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <div
+                key={feature.title}
+                className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-7 transition hover:border-white/15"
+              >
+                <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-brand-blue/25 to-brand-violet/25 text-brand-cyan ring-1 ring-inset ring-white/10">
+                  <feature.icon className="size-5" />
+                </span>
+                <h3 className="mt-5 text-lg font-bold tracking-tight text-white">{feature.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/55">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="container pb-24">
+          <div className="ring-gradient relative overflow-hidden rounded-[2rem] bg-brand-slate/60 p-10 md:p-14">
+            <div className="brand-gradient pointer-events-none absolute inset-0 opacity-60" aria-hidden />
+            <div className="relative grid items-center gap-10 md:grid-cols-[1.4fr_1fr]">
+              <div>
+                <p className="eyebrow">{BRANDING.product.poweredBy}</p>
+                <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-white">{brandTagline}</h2>
+                <p className="mt-4 text-sm text-white/55">
+                  Designed &amp; developed by{" "}
+                  <Link
+                    href={brandUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-white hover:text-brand-cyan"
+                  >
+                    {brandName}
+                  </Link>
+                  .
+                </p>
+              </div>
+              <div className="flex md:justify-end">
+                <Link
+                  href="/chat"
+                  className="group inline-flex h-12 items-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-brand-ink transition hover:bg-white/90"
+                >
+                  Try the concierge
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
 
       <Footer />
-    </main>
+    </div>
   );
 }

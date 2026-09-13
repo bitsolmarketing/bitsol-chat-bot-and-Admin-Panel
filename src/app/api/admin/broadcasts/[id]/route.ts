@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { isOwn } from "@/lib/admin/queries";
 import { logEvent } from "@/lib/notify";
 import { config } from "@/lib/config";
 import { prepareBroadcast, runBroadcast } from "@/lib/whatsapp/broadcast";
@@ -52,13 +53,9 @@ export async function POST(
     where: { id },
     include: { template: { select: { name: true, status: true, metaId: true } } },
   });
-  if (!broadcast) return Response.json({ error: "Broadcast not found." }, { status: 404 });
-
-  if (!canAccessDepartment(session, broadcast.department)) {
-    return Response.json(
-      { error: "That broadcast belongs to the other business." },
-      { status: 403 }
-    );
+  // An archived Institute broadcast is not this console's to send or cancel.
+  if (!broadcast || !isOwn(broadcast.department)) {
+    return Response.json({ error: "Broadcast not found." }, { status: 404 });
   }
 
   if (parsed.data.action === "cancel") {
@@ -74,7 +71,6 @@ export async function POST(
     });
     await logEvent({
       action: "broadcast.cancelled",
-      department: broadcast.department,
       entity: "broadcast",
       entityId: id,
       message: `${session.name} cancelled the broadcast "${broadcast.title}".`,
@@ -140,7 +136,6 @@ export async function POST(
 
   await logEvent({
     action: "broadcast.started",
-    department: broadcast.department,
     entity: "broadcast",
     entityId: id,
     message: `${session.name} started the broadcast "${broadcast.title}" to ${pending} contacts.`,
@@ -177,13 +172,8 @@ export async function DELETE(
 
   const { id } = await params;
   const broadcast = await prisma.broadcast.findUnique({ where: { id } });
-  if (!broadcast) return Response.json({ error: "Broadcast not found." }, { status: 404 });
-
-  if (!canAccessDepartment(session, broadcast.department)) {
-    return Response.json(
-      { error: "That broadcast belongs to the other business." },
-      { status: 403 }
-    );
+  if (!broadcast || !isOwn(broadcast.department)) {
+    return Response.json({ error: "Broadcast not found." }, { status: 404 });
   }
   if (broadcast.status === "SENDING" || broadcast.sent > 0) {
     return Response.json(
@@ -198,7 +188,6 @@ export async function DELETE(
   await logEvent({
     level: "WARN",
     action: "broadcast.deleted",
-    department: broadcast.department,
     entity: "broadcast",
     entityId: id,
     message: `${session.name} deleted the unsent broadcast "${broadcast.title}".`,

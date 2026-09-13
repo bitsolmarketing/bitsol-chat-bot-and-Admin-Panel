@@ -1,71 +1,81 @@
 # BITSOL AI Assistant
 
-One enterprise-grade AI assistant serving **two businesses** under the BITSOL
-umbrella, with a strict wall between them:
+The AI concierge and admin console for **BITSOL Marketing** — business services,
+digital solutions, AI automation and software development.
 
-| | |
-| --- | --- |
-| 🏢 **BITSOL Marketing** | Business services, digital solutions, AI automation, software development |
-| 🎓 **BITSOL Institute of Digital Media & Artificial Intelligence** | Admissions, learning, student services, career guidance |
-
-The assistant works out which business a visitor needs, remembers that choice
-for the rest of the conversation, lets them switch at any time — and never mixes
-information between the two.
+On the website and on WhatsApp, the assistant answers from BITSOL Marketing's own
+knowledge base, captures leads, books consultations and raises support tickets —
+each with a real reference number — in English, Urdu, Roman Urdu or Punjabi.
 
 > **Powered by Artificial Intelligence**
 > **Designed & Developed by [BITSOL MARKETING](https://bitsolmarketing.com)** —
-> _Empowering Businesses & Learners with Artificial Intelligence._
+> _Empowering Businesses with Artificial Intelligence._
 
 ---
 
 ## ✨ What's inside
 
-**Conversational layer**
-- 👋 Welcome screen: *"Please choose how I can assist you today — 🏢 BITSOL Marketing / 🎓 BITSOL Institute"*
-- 🧭 **Department router** — infers the business from the message, sticks to it,
-  detects switches, and asks the clarifying question when it genuinely can't tell
+**Public experience**
+- 🏛️ A landing page and about page in bitsolmarketing.com's own palette
+  (midnight `#050816`, cyan `#00D9FF`, violet `#7C3AED`) and Montserrat
+- 💬 **AI concierge** at `/chat` — a service rail with one-tap quotes,
+  consultations and support on desktop, a slide-over menu on mobile
 - 🌐 **English · Urdu · Roman Urdu · Punjabi**, with RTL rendering and tolerance
   for spelling mistakes, abbreviations and mixed-language input
-- 🎨 The whole UI re-themes to the routed brand (blue for Marketing, emerald for Institute)
-- 📋 Per-business menu panel, suggestions and quick replies
-- 📝 In-chat workflow forms — quote request, consultation booking, admission
-  inquiry, support ticket, career guidance — each issuing a real reference number
+- 📝 In-chat workflow forms — quote request, consultation booking, support
+  ticket — each issuing a real reference number
 - 🎙️ Voice input & voice responses, image/PDF attachment, human handoff with ticketing
 - 🟢 **The same assistant on WhatsApp** — Meta Cloud API webhook, tappable menus
-  and lists, one-question-at-a-time lead & admission capture, human handoff.
-  Same router, same knowledge bases, same reference numbers. See
-  [WhatsApp chatbot](#-whatsapp-chatbot).
+  and lists, one-question-at-a-time lead capture, human handoff. Same knowledge
+  base, same reference numbers. See [WhatsApp chatbot](#-whatsapp-chatbot).
 
 **Business logic**
-- 🏢 11 marketing services, each with overview · benefits · features · process ·
+- 🏢 12 services, each with overview · benefits · features · process ·
   pricing placeholder · portfolio · FAQ · book meeting · request quote
-- 🎓 16 institute courses, each with overview · curriculum · duration · fees ·
-  instalments · trainer · careers · projects · certification · enroll
-- 🗂️ Two physically separate knowledge bases (`knowledge_base_marketing`,
-  `knowledge_base_institute`)
+- 🗂️ A knowledge base of hand-written company entries plus one entry derived
+  from each service, stored in `knowledge_base_marketing`
 
 **Admin console** (`/admin`)
-- Dashboard with today's chats, both lead pipelines, revenue, popular
-  services/courses, open tickets, upcoming meetings & batches, conversion rate,
-  satisfaction and a live activity feed
-- CRM with **separate pipelines** — marketing leads and admission inquiries —
-  plus customers, students, notes, follow-ups and reminders. Every row carries
-  its **source**, so web-chat and WhatsApp leads land in the same board and can
-  be filtered apart
+- Dashboard with won and open pipeline value, win rate, today's chats, new
+  leads, upcoming meetings, active projects, most-requested services and a live
+  activity feed
+- Leads, customers, quotations, meetings, follow-ups and reminders. Every lead
+  carries its **source**, so web-chat and WhatsApp leads land in the same board
+  and can be filtered apart
 - **WhatsApp Inbox** — every number that has messaged the business line, whether
   the 24-hour reply window is still open, and the transcript it produced
-- Catalogue: services, projects, portfolio, courses, batches, faculty
+- Services, projects, portfolio & reviews
 - Knowledge Base CMS with publish states, versioning and AI indexing
-- Support tickets, meetings, quotations, events, media & documents
+- Support tickets, events, media & documents
 - WhatsApp templates, broadcasts, notification queue
 - Reports & analytics, users, roles & permissions, settings, integrations, logs, AI training
 
 **Platform**
-- 🔐 JWT auth, RBAC (roles + permissions), **department-scoped access** enforced
-  in the data layer, edge middleware, rate limiting, audit logging
+- 🔐 JWT auth, RBAC (roles + permissions), edge middleware, rate limiting, audit logging
 - 🧠 Provider-agnostic AI — Claude (default), any OpenAI-compatible API, local
   Ollama, or Gemini — switched by one env var
 - 🐳 Docker, docker-compose, health probe, deployment docs
+
+---
+
+## 🎓 About BITSOL Institute data
+
+This product used to serve a second business, BITSOL Institute of Digital Media
+& Artificial Intelligence. It has been retired from every screen, from the
+assistant and from WhatsApp — **but nothing was deleted from the database.**
+
+- The Institute tables (`courses`, `admissions`, `students`, `faculty`,
+  `batches`, `enrollments`, `attendance`, `assignments`, `submissions`,
+  `certificates`, `knowledge_base_institute`) are still in `schema.prisma` and
+  untouched in PostgreSQL.
+- Shared tables keep their `department` column. Everything the app writes is
+  stamped `MARKETING`, and every console query filters to it, so Institute rows
+  in shared tables (conversations, tickets, templates…) stay hidden.
+- Staff accounts that belonged to the Institute can no longer sign in.
+
+To remove that data permanently, export what you need, delete the Institute
+models from `schema.prisma` and create a migration. That step is irreversible,
+so it is deliberately not part of this codebase.
 
 ---
 
@@ -74,11 +84,11 @@ information between the two.
 | Layer         | Technology                                                        |
 | ------------- | ----------------------------------------------------------------- |
 | Framework     | **Next.js 15** (App Router) · **React 19** · **TypeScript**        |
-| UI            | **Tailwind CSS** · shadcn/ui-style primitives · **Framer Motion** · **Lucide** |
+| UI            | **Tailwind CSS** · shadcn/ui-style primitives · **Framer Motion** · **Lucide** · self-hosted **Montserrat** |
 | Backend       | Next.js **Route Handlers** (Node runtime)                          |
 | Database      | **PostgreSQL** via **Prisma ORM**                                  |
 | Cache / limit | **Redis** (optional; fails open in dev)                            |
-| Auth          | **JWT** (`jose`) + **bcrypt**, RBAC, department scoping            |
+| Auth          | **JWT** (`jose`) + **bcrypt**, RBAC                                |
 | AI            | **Claude** (default) · OpenAI-compatible · Ollama · Gemini         |
 | Deployment    | **Docker** · **PM2/Nginx** ready · GitHub Actions friendly         |
 
@@ -109,16 +119,15 @@ npm run db:seed
 npm run dev
 ```
 
-Open **http://localhost:3000** → **Start a conversation** (or go to `/chat`).
+Open **http://localhost:3000** → **Speak with our AI concierge** (or go to `/chat`).
 The admin console is at **/admin**.
 
 Seeded accounts (change these before any real deploy):
 
-| Account | Email | Scope |
-| --- | --- | --- |
-| Super Admin | `admin@bitsol.local` | Both businesses |
-| Sales Agent | `sales@bitsol.local` | BITSOL Marketing only |
-| Admissions Officer | `admissions@bitsol.local` | BITSOL Institute only |
+| Account | Email |
+| --- | --- |
+| Super Admin | `admin@bitsol.local` |
+| Sales Agent | `sales@bitsol.local` |
 
 Passwords come from `SEED_ADMIN_PASSWORD` / `SEED_STAFF_PASSWORD`
 (default `ChangeMe#2024`).
@@ -143,35 +152,27 @@ Without a key the UI still runs — sending a message shows a graceful error.
 
 ---
 
-## 🧭 How department routing works
+## 🧭 How a turn is handled
 
 ```
 User message
    │
-   ├─ Explicit pick from the welcome menu / switcher?      → use it
-   ├─ Names a business ("BITSOL Institute", 🎓)?           → use it
-   ├─ Strong keyword signal in this message?               → use it
-   │     (and if it contradicts the current department by a
-   │      wide margin, treat it as a department switch)
-   ├─ Department already pinned to the conversation?       → keep it
-   ├─ Signal anywhere in recent history?                   → use it
-   └─ Otherwise                                            → ask:
-        "Would you like help with BITSOL Marketing services
-         or BITSOL Institute admissions and courses?"
+   ├─ detectLanguage()        → EN / UR / Roman UR / PA
+   ├─ retrieveKnowledge()     → the best-matching knowledge-base entries
+   ├─ buildSystemPrompt()     → identity, scope, services, contacts, entries
+   │
+   ├─ stream the model's answer to the browser (SSE)
+   │
+   ├─ shouldEscalate()?       → ticket + team notification
+   ├─ detectAction()?         → open the quote / consultation / support form
+   └─ suggestFollowUps()      → quick-reply chips
 ```
 
-The decision is made in [`src/lib/ai/router.ts`](src/lib/ai/router.ts) before any
-tokens are generated, streamed to the browser as a `meta` SSE event (so the UI
-re-themes immediately), and persisted on the conversation.
-
-Separation is enforced at three layers:
-
-1. **Data** — `retrieveKnowledge(department, …)` has no unscoped mode, and the two
-   knowledge bases are different tables.
-2. **Prompt** — the department system prompt forbids discussing the other
-   business beyond offering to switch.
-3. **Access** — staff scoped to one business cannot read the other's records,
-   checked in `src/lib/admin/queries.ts` and every admin API route.
+The model writes the prose; `src/lib/ai/intents.ts` decides what the product
+*does*, so behaviour stays predictable and testable. The system prompt keeps the
+assistant to BITSOL Marketing's scope — asked about individual courses or
+admissions, it says those aren't offered and points to Corporate Training for
+teams instead of inventing an answer.
 
 ---
 
@@ -179,7 +180,7 @@ Separation is enforced at three layers:
 
 The WhatsApp channel is the same assistant, not a second one. A message arriving
 on the business number goes through `planAssistantTurn()` exactly like a web
-message: same department router, same knowledge bases, same language detection.
+message: same knowledge base, same language detection.
 
 ```
 Customer on WhatsApp
@@ -190,14 +191,15 @@ POST /webhook               ── X-Hub-Signature-256 verified, else 401
    ├─ Message id already seen?  → stop (Meta retries are harmless)
    ├─ Contact upserted, thread resolved (24h window → same conversation)
    │
+   ├─ "menu" / "hi"?            → welcome message + quick actions
    ├─ Mid-capture?              → next form question   (capture.ts)
-   ├─ Tapped a menu button?     → department / quote / handoff
+   ├─ Tapped "Get a quote"?     → start capture
    ├─ Asked for a human?        → ticket + team notification
-   ├─ Quote / admission intent? → start capture
+   ├─ Quote / meeting intent?   → start capture
    └─ Otherwise                 → AI answer + quick-action buttons
    │
    ▼
-Lead or Admission written with source = WHATSAPP → visible in /admin/crm/*
+Lead written with source = WHATSAPP → visible in /admin/crm/leads
 ```
 
 **Why the capture is a state machine, not a prompt.** WhatsApp has no forms, so
@@ -248,7 +250,7 @@ console, the bot just stops replying.
   shows which contacts are still inside the window.
 - **Long answers** are split across bubbles at paragraph boundaries, and the
   assistant's markdown is converted to WhatsApp's `*bold*` / `_italic_`.
-- **`menu`** returns anyone to the business picker; **`stop`** opts them out of
+- **`menu`** returns anyone to the welcome message; **`stop`** opts them out of
   broadcasts (they can still chat).
 
 ---
@@ -258,34 +260,33 @@ console, the bot just stops replying.
 ```
 .
 ├── prisma/
-│   ├── schema.prisma              # dual-department domain model
-│   └── seed.ts                    # RBAC, users, catalogues, KBs, settings
+│   ├── schema.prisma              # domain model (+ retired Institute tables, kept)
+│   └── seed.ts                    # RBAC, users, catalogue, KB, settings
 ├── src/
 │   ├── app/
 │   │   ├── (auth)/login/          # staff sign-in / register
-│   │   ├── (chat)/chat/           # the assistant
-│   │   ├── (admin)/admin/         # admin console (26 modules)
+│   │   ├── (chat)/chat/           # the AI concierge
+│   │   ├── (admin)/admin/         # admin console
 │   │   ├── about/  page.tsx  layout.tsx  globals.css
 │   │   └── api/
-│   │       ├── chat/              # streaming chat (SSE) + routing
+│   │       ├── chat/              # streaming chat (SSE)
 │   │       ├── whatsapp/webhook/  # Meta Cloud API webhook (verify + receive)
-│   │       ├── leads/ admissions/ meetings/ tickets/
+│   │       ├── leads/ meetings/ tickets/
 │   │       ├── catalog/ search/ health/ auth/
 │   │       └── admin/             # record updates, CRM activities
 │   ├── components/
-│   │   ├── chat/                  # ChatWindow, DepartmentPicker, MenuPanel, WorkflowForm
+│   │   ├── chat/                  # ChatWindow, MenuPanel, WorkflowForm
 │   │   ├── admin/                 # AdminShell, nav, tables, status controls
-│   │   ├── branding/ splash/ ui/
+│   │   ├── branding/              # Logo, SiteHeader, Footer, attribution
+│   │   ├── splash/ ui/
 │   ├── data/
-│   │   ├── marketing/             # services · knowledge base · menu
-│   │   ├── institute/             # courses  · knowledge base · menu
-│   │   └── index.ts               # department content registry
+│   │   └── marketing/             # services · knowledge base · menu
 │   ├── lib/
-│   │   ├── brands.ts              # the two business profiles
+│   │   ├── brands.ts              # the BITSOL Marketing profile
 │   │   ├── i18n.ts                # EN / UR / Roman UR / PA
-│   │   ├── ai/                    # router · retrieval · prompts · intents · providers
+│   │   ├── ai/                    # retrieval · prompt · intents · providers
 │   │   ├── whatsapp/              # Cloud API client · parser · capture · handler
-│   │   ├── admin/queries.ts       # scoped, failure-tolerant data access
+│   │   ├── admin/queries.ts       # failure-tolerant data access, Institute filter
 │   │   └── auth.ts db.ts redis.ts config.ts notify.ts api.ts session.ts
 │   ├── middleware.ts              # admin console guard
 │   └── types/
@@ -309,15 +310,13 @@ App on **http://localhost:3000**, Postgres on `5432`, Redis on `6379`.
 
 ## ⚠️ Before going live
 
-Pricing and fees ship as **clearly-labelled placeholders**, and contact details
-as representative defaults. The assistant always presents them as indicative and
-offers a written quotation or an admissions call for the real figure — but they
-must still be reviewed:
+Pricing ships as **clearly-labelled placeholders**, and contact details as
+representative defaults. The assistant always presents prices as indicative and
+offers a written quotation for the real figure — but they must still be reviewed:
 
 1. `src/data/marketing/services.ts` — service pricing
-2. `src/data/institute/courses.ts` — course fees and instalment plans
-3. `src/lib/brands.ts` — phone, WhatsApp, email, address and hours for both businesses
-4. Re-run `npm run db:seed` to push the changes into the database
+2. `src/lib/brands.ts` — phone, WhatsApp, email, address and hours
+3. Re-run `npm run db:seed` to push the changes into the database
 
 ---
 
@@ -330,7 +329,7 @@ must still be reviewed:
 | `npm start`             | Start the production server               |
 | `npm run typecheck`     | TypeScript check                          |
 | `npm run prisma:migrate`| Create/apply a dev migration              |
-| `npm run db:seed`       | Seed RBAC, catalogues and knowledge bases |
+| `npm run db:seed`       | Seed RBAC, catalogue and knowledge base   |
 | `npm run prisma:studio` | Open Prisma Studio                        |
 
 ---
@@ -338,6 +337,6 @@ must still be reviewed:
 <div align="center">
 
 **Designed & Developed by [BITSOL MARKETING](https://bitsolmarketing.com)**
-_Empowering Businesses & Learners with Artificial Intelligence._
+_Empowering Businesses with Artificial Intelligence._
 
 </div>

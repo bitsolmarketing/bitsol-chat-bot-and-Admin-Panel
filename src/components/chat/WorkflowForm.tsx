@@ -6,25 +6,22 @@ import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, Textarea } from "@/components/ui/field";
+import { BRAND } from "@/lib/brands";
 import { MARKETING_SERVICES } from "@/data/marketing/services";
-import { INSTITUTE_COURSES } from "@/data/institute/courses";
-import type { ChatAction, ChatActionKind, Department, SubmissionResult } from "@/types";
+import type { ChatAction, ChatActionKind, SubmissionResult } from "@/types";
 
 /**
  * =============================================================================
  *  In-chat workflow forms
  * =============================================================================
  *
- *  Lead capture, quote requests, consultation booking, admission inquiries and
- *  support tickets all need 6–10 fields. Collecting those conversationally is
- *  slow and error-prone, so the assistant finishes its sentence and the client
- *  opens the matching form here.
+ *  Lead capture, quote requests, consultation booking and support tickets all
+ *  need 6–10 fields. Collecting those conversationally is slow and
+ *  error-prone, so the assistant finishes its sentence and the client opens the
+ *  matching form here.
  *
  *  Each form is described declaratively (fields + endpoint) so adding one is a
- *  data change, not a new component. Career guidance is the exception: it has
- *  no endpoint — the answers are composed into a prompt and sent back to the
- *  assistant, which is exactly what "suggest a course based on interest,
- *  education, goals and experience" needs.
+ *  data change, not a new component.
  * =============================================================================
  */
 
@@ -47,8 +44,8 @@ interface FormSpec {
   intro: string;
   submitLabel: string;
   fields: FormField[];
-  /** POST target, or `null` for prompt-only workflows (career guidance). */
-  endpoint: string | null;
+  /** POST target. */
+  endpoint: string;
 }
 
 const BUDGETS = [
@@ -73,18 +70,10 @@ const MEETING_TIMES = [
   "3:00 PM", "4:00 PM", "5:00 PM", "6:00 PM",
 ];
 
-const BATCHES = [
-  "Morning (9:00 – 11:00 AM)",
-  "Afternoon (2:00 – 4:00 PM)",
-  "Evening (6:00 – 8:00 PM)",
-  "Weekend (Sat & Sun)",
-  "Online / live classes",
-];
-
 const options = (values: readonly string[]) =>
   values.map((value) => ({ value, label: value }));
 
-function specFor(kind: ChatActionKind, department: Department): FormSpec | null {
+function specFor(kind: ChatActionKind): FormSpec | null {
   switch (kind) {
     case "LEAD_FORM":
     case "QUOTE_FORM":
@@ -121,23 +110,16 @@ function specFor(kind: ChatActionKind, department: Department): FormSpec | null 
 
     case "MEETING_FORM":
       return {
-        title: department === "MARKETING" ? "Book a free consultation" : "Book a counselling session",
+        title: "Book a free consultation",
         intro:
-          department === "MARKETING"
-            ? "A free 30-minute call to understand your goal and recommend the right approach."
-            : "Speak to an admission officer about courses, fees and the right batch for you.",
+          "A free 30-minute call with a senior member of our team to understand your goal and recommend the right approach.",
         submitLabel: "Book meeting",
         endpoint: "/api/meetings",
         fields: [
           { name: "name", label: "Your name", type: "text", required: true, half: true },
           { name: "phone", label: "Phone / WhatsApp", type: "tel", required: true, half: true },
           { name: "email", label: "Email", type: "email", half: true },
-          {
-            name: "businessName",
-            label: department === "MARKETING" ? "Business name" : "Institution / employer",
-            type: "text",
-            half: true,
-          },
+          { name: "businessName", label: "Business name", type: "text", half: true },
           { name: "preferredDate", label: "Preferred date", type: "date", required: true, half: true },
           { name: "preferredTime", label: "Preferred time", type: "select", required: true, half: true, options: options(MEETING_TIMES) },
           {
@@ -184,103 +166,6 @@ function specFor(kind: ChatActionKind, department: Department): FormSpec | null 
         ],
       };
 
-    case "ADMISSION_FORM":
-      return {
-        title: "Admission inquiry",
-        intro:
-          "Fill this in and an admission officer will call you to confirm your seat, fee plan and batch.",
-        submitLabel: "Submit inquiry",
-        endpoint: "/api/admissions",
-        fields: [
-          { name: "studentName", label: "Student name", type: "text", required: true, half: true },
-          { name: "fatherName", label: "Father's name", type: "text", half: true },
-          { name: "phone", label: "Phone", type: "tel", required: true, half: true },
-          { name: "whatsapp", label: "WhatsApp", type: "tel", half: true },
-          { name: "email", label: "Email", type: "email", half: true },
-          { name: "city", label: "City", type: "text", half: true },
-          {
-            name: "qualification",
-            label: "Last qualification",
-            type: "select",
-            half: true,
-            options: options([
-              "Matric",
-              "Intermediate / FSc / FA",
-              "Bachelor's",
-              "Master's",
-              "Diploma",
-              "Other",
-            ]),
-          },
-          {
-            name: "course",
-            label: "Interested course",
-            type: "select",
-            required: true,
-            half: true,
-            options: INSTITUTE_COURSES.map((c) => ({ value: c.slug, label: c.name })),
-          },
-          { name: "preferredBatch", label: "Preferred batch", type: "select", options: options(BATCHES) },
-          { name: "notes", label: "Anything else we should know?", type: "textarea" },
-        ],
-      };
-
-    case "CAREER_FORM":
-      return {
-        title: "Career guidance",
-        intro:
-          "Four quick questions and I'll recommend the course that fits you best — plus a solid alternative.",
-        submitLabel: "Get my recommendation",
-        endpoint: null,
-        fields: [
-          {
-            name: "interest",
-            label: "What kind of work do you enjoy?",
-            type: "select",
-            required: true,
-            options: options([
-              "Creative / design & video",
-              "Technical / coding & systems",
-              "Business / marketing & sales",
-              "Working with people",
-              "Not sure yet",
-            ]),
-          },
-          {
-            name: "education",
-            label: "Your education",
-            type: "select",
-            required: true,
-            options: options([
-              "Matric",
-              "Intermediate / FSc / FA",
-              "Bachelor's",
-              "Master's",
-              "Other",
-            ]),
-          },
-          {
-            name: "goal",
-            label: "What's your goal?",
-            type: "select",
-            required: true,
-            options: options([
-              "Get a job",
-              "Start freelancing / earn online",
-              "Grow my own business",
-              "Change career",
-              "Learn a new skill",
-            ]),
-          },
-          {
-            name: "experience",
-            label: "Any experience so far?",
-            type: "textarea",
-            placeholder: "Anything you've tried, even informally — or write 'none'.",
-          },
-        ],
-      };
-
     default:
       return null;
   }
@@ -288,22 +173,17 @@ function specFor(kind: ChatActionKind, department: Department): FormSpec | null 
 
 export function WorkflowForm({
   action,
-  department,
   conversationRef,
   onCancel,
   onResult,
-  onPrompt,
 }: {
   action: ChatAction;
-  department: Department;
   conversationRef: string;
   onCancel: () => void;
   /** Confirmation message to append to the transcript as the assistant. */
   onResult: (message: string) => void;
-  /** Used by prompt-only workflows (career guidance). */
-  onPrompt: (prompt: string) => void;
 }) {
-  const spec = useMemo(() => specFor(action.kind, department), [action.kind, department]);
+  const spec = useMemo(() => specFor(action.kind), [action.kind]);
   const [values, setValues] = useState<Record<string, string>>(() =>
     action.subject ? seedSubject(action.kind, action.subject) : {}
   );
@@ -342,26 +222,12 @@ export function WorkflowForm({
     setFormError(null);
     if (!validate()) return;
 
-    // Prompt-only workflow: hand the answers back to the assistant.
-    if (!spec!.endpoint) {
-      onPrompt(careerPrompt(values));
-      return;
-    }
-
     setSubmitting(true);
     try {
       const res = await fetch(spec!.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...values,
-          // Meetings and tickets are shared endpoints and need the department;
-          // leads and admissions are single-business by definition.
-          ...(spec!.endpoint === "/api/meetings" || spec!.endpoint === "/api/tickets"
-            ? { department }
-            : {}),
-          conversationRef,
-        }),
+        body: JSON.stringify({ ...values, conversationRef }),
       });
       const result = (await res.json().catch(() => null)) as SubmissionResult | null;
 
@@ -385,18 +251,19 @@ export function WorkflowForm({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       onSubmit={submit}
-      className="rounded-2xl border bg-card p-4 shadow-soft"
+      className="ring-gradient rounded-2xl bg-brand-slate/70 p-5 shadow-glow backdrop-blur"
     >
-      <div className="mb-3 flex items-start gap-3">
+      <div className="mb-4 flex items-start gap-3">
         <div className="flex-1">
-          <h3 className="text-sm font-semibold">{spec.title}</h3>
-          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{spec.intro}</p>
+          <p className="eyebrow">{BRAND.name}</p>
+          <h3 className="mt-2 text-lg font-bold tracking-tight text-white">{spec.title}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/55">{spec.intro}</p>
         </div>
         <button
           type="button"
           onClick={onCancel}
           aria-label="Close form"
-          className="grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+          className="grid size-8 shrink-0 place-items-center rounded-lg text-white/50 hover:bg-white/5 hover:text-white"
         >
           <X className="size-4" />
         </button>
@@ -460,13 +327,13 @@ export function WorkflowForm({
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
-        <Button type="submit" size="sm" disabled={submitting} className="gap-1.5">
+        <Button type="submit" variant="brand" size="sm" disabled={submitting} className="gap-1.5">
           {submitting && <Loader2 className="size-4 animate-spin" />}
           {spec.submitLabel}
         </Button>
       </div>
 
-      <p className="mt-3 text-[11px] text-muted-foreground">
+      <p className="mt-4 border-t border-white/[0.06] pt-3 text-[11px] text-white/40">
         We use these details only to respond to your request. Never share passwords, OTPs or card
         numbers here.
       </p>
@@ -474,25 +341,12 @@ export function WorkflowForm({
   );
 }
 
-/** Pre-fill the service/course when the user already named one in chat. */
+/** Pre-fill the service when the user already named one in chat. */
 function seedSubject(kind: ChatActionKind, subject: string): Record<string, string> {
-  if (kind === "ADMISSION_FORM") return { course: subject };
   if (kind === "LEAD_FORM" || kind === "QUOTE_FORM") return { service: subject };
   return {};
 }
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function careerPrompt(values: Record<string, string>): string {
-  return [
-    "Please recommend a course for me based on this:",
-    `- Interest: ${values.interest || "not specified"}`,
-    `- Education: ${values.education || "not specified"}`,
-    `- Goal: ${values.goal || "not specified"}`,
-    `- Experience: ${values.experience?.trim() || "none"}`,
-    "",
-    "Give me one main recommendation and one alternative, with your reasoning, the duration and the fee.",
-  ].join("\n");
 }

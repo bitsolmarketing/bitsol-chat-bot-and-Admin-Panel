@@ -1,5 +1,5 @@
 import type { KnowledgeEntry } from "@/types";
-import { BRANDS } from "@/lib/brands";
+import { BRAND as brand } from "@/lib/brands";
 import { MARKETING_SERVICES } from "./services";
 
 /**
@@ -7,9 +7,8 @@ import { MARKETING_SERVICES } from "./services";
  *  BITSOL Marketing — knowledge base
  * =============================================================================
  *
- *  The assistant answers MARKETING conversations from this content first and
- *  only falls back to general model knowledge when nothing matches. It is never
- *  loaded for an INSTITUTE conversation.
+ *  The assistant answers from this content first and only falls back to
+ *  general model knowledge when nothing matches.
  *
  *  Two sources make up the base:
  *    1. Hand-written company entries below (about, process, pricing, support…)
@@ -21,12 +20,9 @@ import { MARKETING_SERVICES } from "./services";
  * =============================================================================
  */
 
-const brand = BRANDS.MARKETING;
-
 const COMPANY_ENTRIES: KnowledgeEntry[] = [
   {
     id: "mk-about",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "About",
     question: "What is BITSOL Marketing and what do you do?",
@@ -35,7 +31,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-why-us",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "About",
     question: "Why should we choose BITSOL Marketing?",
@@ -45,7 +40,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-services-overview",
-    department: "MARKETING",
     kind: "SERVICE",
     category: "Services",
     question: "What services does BITSOL Marketing offer?",
@@ -54,7 +48,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-process",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "How we work",
     question: "How does the process work from first contact to delivery?",
@@ -64,7 +57,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-pricing",
-    department: "MARKETING",
     kind: "POLICY",
     category: "Pricing",
     question: "How much do your services cost?",
@@ -74,7 +66,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-payment-terms",
-    department: "MARKETING",
     kind: "POLICY",
     category: "Pricing",
     question: "What are your payment terms?",
@@ -84,7 +75,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-quote",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Quote",
     question: "How do I request a quote?",
@@ -94,7 +84,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-consultation",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Consultation",
     question: "Can I book a consultation or meeting?",
@@ -103,7 +92,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-contact",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Contact",
     question: "How do I contact BITSOL Marketing?",
@@ -112,7 +100,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-support",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Support",
     question: "I need support with an existing project or service.",
@@ -122,7 +109,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-portfolio",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Portfolio",
     question: "Can I see your portfolio or past work?",
@@ -132,7 +118,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-reviews",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "Portfolio",
     question: "What do your clients say about you?",
@@ -142,7 +127,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-timeline",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "How we work",
     question: "How long do projects take?",
@@ -152,7 +136,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-ownership",
-    department: "MARKETING",
     kind: "POLICY",
     category: "How we work",
     question: "Who owns the code, designs and accounts?",
@@ -162,7 +145,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
   },
   {
     id: "mk-industries",
-    department: "MARKETING",
     kind: "ARTICLE",
     category: "About",
     question: "Which industries do you work with?",
@@ -171,13 +153,12 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
     keywords: ["industry", "industries", "sector", "niche", "who do you work with", "experience"],
   },
   {
-    id: "mk-institute-crosslink",
-    department: "MARKETING",
+    id: "mk-individual-courses",
     kind: "ARTICLE",
     category: "About",
-    question: "Do you also offer training courses for individuals?",
+    question: "Do you offer training courses for individuals?",
     answer:
-      "Corporate training for teams is a BITSOL Marketing service. Individual courses — digital marketing, AI, design, video, development, freelancing — are run by our sister organisation, **BITSOL Institute of Digital Media & Artificial Intelligence**. If you'd like course, admission or fee information, just say so and I'll switch you over to the Institute.",
+      "Our training is built for **business teams**, not individual enrolment. Through **Corporate Training** we upskill your staff on AI tools, digital marketing, automation and the systems we build for you — delivered on-site or online, with content tailored to each team's real responsibilities.\n\nIf you're looking to train your team, I can share the programme details or book a consultation to scope it.",
     keywords: ["course", "courses", "learn", "training for me", "student", "admission", "institute", "classes", "teach"],
   },
 ];
@@ -185,7 +166,6 @@ const COMPANY_ENTRIES: KnowledgeEntry[] = [
 /** One knowledge entry per service, derived from the catalogue. */
 const SERVICE_ENTRIES: KnowledgeEntry[] = MARKETING_SERVICES.map((service) => ({
   id: `mk-service-${service.slug}`,
-  department: "MARKETING" as const,
   kind: "SERVICE" as const,
   category: "Services",
   question: `Tell me about ${service.name}.`,

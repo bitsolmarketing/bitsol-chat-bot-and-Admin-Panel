@@ -1,13 +1,12 @@
 import Link from "next/link";
-import { MessageCircle, Briefcase, ClipboardList, Clock } from "lucide-react";
+import { MessageCircle, Briefcase, Clock, PhoneForwarded } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   Callout,
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
 } from "@/components/admin/ui";
@@ -27,31 +26,32 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
  * window is still open, and what the conversation produced.
  */
 export default async function WhatsappInboxPage() {
-  const session = await requireAdmin("/admin/messaging/whatsapp");
-  const department = sessionDepartment(session);
+  await requireAdmin("/admin/messaging/whatsapp");
   const openedAfter = new Date(Date.now() - WINDOW_MS);
 
   const { data, error } = await safeQuery(
     async () => {
       const contacts = await prisma.whatsappContact.findMany({
-        where: department ? { department } : undefined,
+        where: OWN_OR_GLOBAL,
         orderBy: { lastInboundAt: "desc" },
         take: 100,
       });
 
       const phones = contacts.map((contact) => contact.phone);
 
-      const [conversations, leads, admissions, totals] = await Promise.all([
+      const [conversations, leads, handoffs, totals] = await Promise.all([
         phones.length
           ? prisma.conversation.findMany({
-              where: { channel: "WHATSAPP", contactPhone: { in: phones } },
+              where: { channel: "WHATSAPP", contactPhone: { in: phones }, ...OWN_OR_GLOBAL },
               orderBy: { updatedAt: "desc" },
               select: { id: true, contactPhone: true, handedOff: true },
             })
           : Promise.resolve([]),
         prisma.marketingLead.count({ where: { source: "WHATSAPP" } }),
-        prisma.admission.count({ where: { source: "WHATSAPP" } }),
-        prisma.whatsappContact.count({ where: department ? { department } : undefined }),
+        prisma.conversation.count({
+          where: { channel: "WHATSAPP", handedOff: true, ...OWN_OR_GLOBAL },
+        }),
+        prisma.whatsappContact.count({ where: OWN_OR_GLOBAL }),
       ]);
 
       // First match wins — the list is already newest-first.
@@ -65,13 +65,13 @@ export default async function WhatsappInboxPage() {
         }
       }
 
-      return { contacts, latest, leads, admissions, totals };
+      return { contacts, latest, leads, handoffs, totals };
     },
     {
       contacts: [],
       latest: new Map<string, { id: string; handedOff: boolean }>(),
       leads: 0,
-      admissions: 0,
+      handoffs: 0,
       totals: 0,
     }
   );
@@ -83,8 +83,9 @@ export default async function WhatsappInboxPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Support & Messaging"
         title="WhatsApp Inbox"
-        description="Everyone who has messaged the BITSOL WhatsApp number, and what their conversation turned into."
+        description="Everyone who has messaged the BITSOL Marketing WhatsApp number, and what their conversation turned into."
       />
 
       {error && <DbNotice error={error} />}
@@ -119,10 +120,11 @@ export default async function WhatsappInboxPage() {
           href="/admin/crm/leads?source=WHATSAPP"
         />
         <StatCard
-          label="Admissions from WhatsApp"
-          value={data.admissions}
-          icon={ClipboardList}
-          href="/admin/crm/admissions?source=WHATSAPP"
+          label="Handed to the team"
+          value={data.handoffs}
+          hint="Asked for a human on WhatsApp"
+          icon={PhoneForwarded}
+          href="/admin/conversations?filter=handoff"
         />
       </div>
 
@@ -148,15 +150,6 @@ export default async function WhatsappInboxPage() {
             ),
           },
           {
-            header: "Business",
-            cell: (row) =>
-              row.department ? (
-                <DepartmentTag department={row.department} />
-              ) : (
-                <span className="text-xs text-muted-foreground">Not routed</span>
-              ),
-          },
-          {
             header: "Last message",
             cell: (row) => (
               <span className="whitespace-nowrap text-xs text-muted-foreground">
@@ -172,7 +165,7 @@ export default async function WhatsappInboxPage() {
                 <span
                   className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${
                     open
-                      ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400"
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                       : "bg-secondary text-muted-foreground"
                   }`}
                 >
@@ -187,14 +180,14 @@ export default async function WhatsappInboxPage() {
               const conversation = data.latest.get(row.phone);
               if (row.isBlocked) {
                 return (
-                  <span className="rounded-full bg-rose-500/12 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:text-rose-400">
+                  <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:text-rose-400">
                     Blocked
                   </span>
                 );
               }
               if (conversation?.handedOff) {
                 return (
-                  <span className="rounded-full bg-amber-500/14 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                     Waiting on a human
                   </span>
                 );

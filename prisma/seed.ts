@@ -4,17 +4,20 @@
  *  Designed & Developed by BITSOL MARKETING
  * =============================================================================
  *
- *  Populates a production-ready starting state:
+ *  Populates a production-ready starting state for BITSOL Marketing:
  *
  *    • RBAC — permissions, roles and role/permission grants
- *    • Users — super admin plus one scoped staff account per business
- *    • BITSOL Marketing — services, portfolio, reviews
- *    • BITSOL Institute — faculty, courses, upcoming batches
- *    • Both knowledge bases (kept in physically separate tables)
+ *    • Users — super admin plus a sales agent
+ *    • Services, portfolio and reviews
+ *    • The knowledge base
  *    • Settings, WhatsApp templates, announcements and events
  *
  *  Idempotent: every write is an upsert or an existence check, so it is safe to
  *  re-run after editing the catalogues in `src/data`.
+ *
+ *  It never deletes. A database seeded while BITSOL Institute was still part of
+ *  the product keeps its Institute roles, courses and records; the app simply
+ *  no longer reads them.
  *
  *  Run with:  npm run db:seed
  * =============================================================================
@@ -24,8 +27,6 @@ import bcrypt from "bcryptjs";
 
 import { MARKETING_SERVICES } from "../src/data/marketing/services";
 import { MARKETING_KNOWLEDGE_BASE } from "../src/data/marketing/knowledge-base";
-import { INSTITUTE_COURSES } from "../src/data/institute/courses";
-import { INSTITUTE_KNOWLEDGE_BASE } from "../src/data/institute/knowledge-base";
 
 const prisma = new PrismaClient();
 
@@ -37,8 +38,7 @@ async function main() {
   await seedPermissionsAndRoles();
   await seedUsers();
   await seedMarketing();
-  await seedInstitute();
-  await seedKnowledgeBases();
+  await seedKnowledgeBase();
   await seedSettings();
   await seedContent();
 
@@ -51,16 +51,10 @@ const PERMISSIONS: Array<{ key: string; group: string; description: string }> = 
   { key: "dashboard.view", group: "Dashboard", description: "View the admin dashboard" },
   { key: "conversations.view", group: "Conversations", description: "View live and past conversations" },
   { key: "conversations.takeover", group: "Conversations", description: "Take over a conversation from the assistant" },
-  { key: "crm.leads.view", group: "CRM", description: "View marketing leads" },
-  { key: "crm.leads.manage", group: "CRM", description: "Create, edit and move marketing leads" },
-  { key: "crm.admissions.view", group: "CRM", description: "View admission inquiries" },
-  { key: "crm.admissions.manage", group: "CRM", description: "Create, edit and move admission inquiries" },
+  { key: "crm.leads.view", group: "CRM", description: "View leads" },
+  { key: "crm.leads.manage", group: "CRM", description: "Create, edit and move leads" },
   { key: "customers.manage", group: "CRM", description: "Manage customers" },
-  { key: "students.manage", group: "Academics", description: "Manage students and enrollments" },
-  { key: "courses.manage", group: "Academics", description: "Manage courses, batches and faculty" },
-  { key: "attendance.manage", group: "Academics", description: "Mark and edit attendance" },
-  { key: "certificates.issue", group: "Academics", description: "Issue certificates" },
-  { key: "services.manage", group: "Catalogue", description: "Manage marketing services" },
+  { key: "services.manage", group: "Catalogue", description: "Manage services" },
   { key: "portfolio.manage", group: "Catalogue", description: "Manage portfolio and reviews" },
   { key: "knowledge.view", group: "Knowledge Base", description: "View knowledge base content" },
   { key: "knowledge.manage", group: "Knowledge Base", description: "Create and edit knowledge base content" },
@@ -86,7 +80,7 @@ const ROLES: Array<{
   {
     key: "super-admin",
     name: "Super Admin",
-    description: "Unrestricted access across both businesses.",
+    description: "Unrestricted access to every module.",
     department: null,
     permissions: "ALL",
   },
@@ -112,37 +106,6 @@ const ROLES: Array<{
       "dashboard.view", "conversations.view", "crm.leads.view", "crm.leads.manage",
       "customers.manage", "meetings.manage", "quotes.manage", "tickets.view",
     ],
-  },
-  {
-    key: "institute-admin",
-    name: "Institute Admin",
-    description: "Full access to BITSOL Institute modules.",
-    department: "INSTITUTE",
-    permissions: [
-      "dashboard.view", "conversations.view", "conversations.takeover",
-      "crm.admissions.view", "crm.admissions.manage", "students.manage",
-      "courses.manage", "attendance.manage", "certificates.issue",
-      "knowledge.view", "knowledge.manage", "knowledge.publish",
-      "tickets.view", "tickets.manage", "meetings.manage", "broadcasts.send",
-      "reports.view",
-    ],
-  },
-  {
-    key: "admissions-officer",
-    name: "Admissions Officer",
-    description: "Works the BITSOL Institute admissions pipeline.",
-    department: "INSTITUTE",
-    permissions: [
-      "dashboard.view", "conversations.view", "crm.admissions.view",
-      "crm.admissions.manage", "students.manage", "meetings.manage", "tickets.view",
-    ],
-  },
-  {
-    key: "instructor",
-    name: "Instructor",
-    description: "Teaches batches; manages attendance and assignments.",
-    department: "INSTITUTE",
-    permissions: ["dashboard.view", "students.manage", "attendance.manage", "courses.manage"],
   },
 ];
 
@@ -206,14 +169,6 @@ async function seedUsers() {
       role: "AGENT" as const,
       department: "MARKETING" as Department,
       roleKey: "sales-agent",
-    },
-    {
-      email: "admissions@bitsol.local",
-      password: process.env.SEED_STAFF_PASSWORD ?? "ChangeMe#2024",
-      name: "Admissions Officer",
-      role: "AGENT" as const,
-      department: "INSTITUTE" as Department,
-      roleKey: "admissions-officer",
     },
   ];
 
@@ -310,20 +265,6 @@ async function seedMarketing() {
       rating: 5,
       body: "They explained the trade-offs honestly instead of overselling, then delivered on schedule. We own the code and the ad accounts — no lock-in.",
     },
-    {
-      department: "INSTITUTE" as Department,
-      author: "Graduate, Digital Marketing with AI",
-      role: "Now freelancing",
-      rating: 5,
-      body: "The projects were real client work, not classroom exercises. I had a portfolio before the course finished and my first paying client a month later.",
-    },
-    {
-      department: "INSTITUTE" as Department,
-      author: "Graduate, Full Stack Web Development",
-      role: "Junior developer",
-      rating: 5,
-      body: "Trainers who actually build software for a living. The final project got me through my first technical interview.",
-    },
   ];
 
   for (const review of reviews) {
@@ -335,142 +276,9 @@ async function seedMarketing() {
   console.log(`   ✔ Reviews: ${reviews.length}`);
 }
 
-// -------------------------------------------------------------- Institute ---
+// --------------------------------------------------------- Knowledge base ---
 
-const FACULTY = [
-  {
-    reference: "BI-FAC-0001",
-    name: "Lead Trainer — Marketing",
-    title: "Senior Digital Marketing Strategist",
-    expertise: ["Digital Marketing", "Meta Ads", "Google Ads", "Analytics"],
-    groups: ["Digital Marketing"],
-  },
-  {
-    reference: "BI-FAC-0002",
-    name: "Lead Trainer — Design & Media",
-    title: "Brand & Motion Designer",
-    expertise: ["Photoshop", "Illustrator", "Premiere Pro", "After Effects"],
-    groups: ["Design & Media"],
-  },
-  {
-    reference: "BI-FAC-0003",
-    name: "Lead Trainer — Development",
-    title: "Full Stack Engineer",
-    expertise: ["React", "Next.js", "Node.js", "PostgreSQL"],
-    groups: ["Development"],
-  },
-  {
-    reference: "BI-FAC-0004",
-    name: "Lead Trainer — Artificial Intelligence",
-    title: "AI Solutions Architect",
-    expertise: ["Prompt Engineering", "AI Agents", "Automation", "RAG"],
-    groups: ["Artificial Intelligence"],
-  },
-  {
-    reference: "BI-FAC-0005",
-    name: "Lead Trainer — Business & Career",
-    title: "Freelance & Startup Mentor",
-    expertise: ["Freelancing", "Upwork", "Business Models", "Social Commerce"],
-    groups: ["Business & Career"],
-  },
-];
-
-async function seedInstitute() {
-  const facultyByGroup = new Map<string, string>();
-
-  for (const member of FACULTY) {
-    const record = await prisma.faculty.upsert({
-      where: { reference: member.reference },
-      update: { name: member.name, title: member.title, expertise: member.expertise },
-      create: {
-        reference: member.reference,
-        name: member.name,
-        title: member.title,
-        expertise: member.expertise,
-      },
-    });
-    for (const group of member.groups) facultyByGroup.set(group, record.id);
-  }
-  console.log(`   ✔ Faculty: ${FACULTY.length}`);
-
-  for (const [index, course] of INSTITUTE_COURSES.entries()) {
-    const data = {
-      name: course.name,
-      group: course.group,
-      tagline: course.tagline,
-      overview: course.overview,
-      curriculum: course.curriculum,
-      duration: course.duration,
-      feeFrom: course.fee.startingAt,
-      feeModel: course.fee.model,
-      feeNote: course.fee.note,
-      instalments: course.instalments as unknown as Prisma.InputJsonValue,
-      careers: course.careers,
-      projects: course.projects,
-      certification: course.certification,
-      eligibility: course.eligibility,
-      facultyId: facultyByGroup.get(course.group) ?? null,
-      sortOrder: index,
-    };
-
-    await prisma.course.upsert({
-      where: { slug: course.slug },
-      update: data,
-      create: { slug: course.slug, ...data },
-    });
-  }
-  console.log(`   ✔ Courses: ${INSTITUTE_COURSES.length}`);
-
-  // Upcoming batches for the four flagship courses, starting next month.
-  const flagship = [
-    "digital-marketing-with-ai",
-    "graphic-designing",
-    "full-stack-web-development",
-    "freelancing",
-  ];
-  const start = new Date();
-  start.setMonth(start.getMonth() + 1, 1);
-  start.setHours(0, 0, 0, 0);
-
-  const schedules = [
-    "Mon / Wed / Fri · 6:00 – 8:00 PM",
-    "Tue / Thu / Sat · 2:00 – 4:00 PM",
-    "Mon – Thu · 9:00 – 11:00 AM",
-    "Sat & Sun · 10:00 AM – 1:00 PM",
-  ];
-
-  for (const [index, slug] of flagship.entries()) {
-    const course = await prisma.course.findUnique({
-      where: { slug },
-      select: { id: true, facultyId: true },
-    });
-    if (!course) continue;
-
-    const code = `${slug.slice(0, 8).toUpperCase()}-${start.getFullYear()}-${String(
-      start.getMonth() + 1
-    ).padStart(2, "0")}`;
-
-    await prisma.batch.upsert({
-      where: { code },
-      update: { status: "ENROLLING", startDate: start, schedule: schedules[index] },
-      create: {
-        code,
-        courseId: course.id,
-        facultyId: course.facultyId,
-        status: "ENROLLING",
-        startDate: start,
-        schedule: schedules[index],
-        mode: index === 3 ? "Online / live" : "On-campus",
-        seats: 25,
-      },
-    });
-  }
-  console.log(`   ✔ Upcoming batches: ${flagship.length}`);
-}
-
-// -------------------------------------------------------- Knowledge bases ---
-
-async function seedKnowledgeBases() {
+async function seedKnowledgeBase() {
   for (const [index, entry] of MARKETING_KNOWLEDGE_BASE.entries()) {
     const data = {
       kind: entry.kind,
@@ -489,25 +297,6 @@ async function seedKnowledgeBases() {
     });
   }
   console.log(`   ✔ Marketing knowledge base: ${MARKETING_KNOWLEDGE_BASE.length} entries`);
-
-  for (const [index, entry] of INSTITUTE_KNOWLEDGE_BASE.entries()) {
-    const data = {
-      kind: entry.kind,
-      category: entry.category,
-      question: entry.question,
-      answer: entry.answer,
-      keywords: entry.keywords,
-      state: "PUBLISHED" as const,
-      indexedAt: new Date(),
-      sortOrder: index,
-    };
-    await prisma.instituteKnowledge.upsert({
-      where: { slug: entry.id },
-      update: data,
-      create: { slug: entry.id, ...data },
-    });
-  }
-  console.log(`   ✔ Institute knowledge base: ${INSTITUTE_KNOWLEDGE_BASE.length} entries`);
 }
 
 // --------------------------------------------------------------- Settings ---
@@ -524,15 +313,8 @@ async function seedSettings() {
       key: "branding.marketing",
       group: "branding",
       department: "MARKETING",
-      value: { logoUrl: "", primaryColor: "#1a3fa0", accentColor: "#0ea5e9" },
+      value: { logoUrl: "", primaryColor: "#2563EB", accentColor: "#00D9FF", surface: "#050816" },
       description: "BITSOL Marketing logo and brand colours.",
-    },
-    {
-      key: "branding.institute",
-      group: "branding",
-      department: "INSTITUTE",
-      value: { logoUrl: "", primaryColor: "#0f5f52", accentColor: "#22a06b" },
-      description: "BITSOL Institute logo and brand colours.",
     },
     {
       key: "company.marketing",
@@ -546,19 +328,6 @@ async function seedSettings() {
         hours: "Mon–Sat, 10:00 AM – 7:00 PM",
       },
       description: "Company details shown by the assistant and on the website.",
-    },
-    {
-      key: "company.institute",
-      group: "company",
-      department: "INSTITUTE",
-      value: {
-        name: "BITSOL Institute of Digital Media & Artificial Intelligence",
-        phone: "+92 312 0141581",
-        email: "admissions@bitsolinstitute.com",
-        address: "Faisalabad, Pakistan",
-        hours: "Mon–Sat, 9:00 AM – 8:00 PM",
-      },
-      description: "Institute details shown by the assistant and on the website.",
     },
     {
       key: "ai.defaults",
@@ -606,30 +375,6 @@ async function seedContent() {
       body: "Hi {{1}}, your consultation is confirmed for {{2}} at {{3}}. Reference: {{4}}.",
       variables: ["name", "date", "time", "reference"],
     },
-    {
-      key: "in-admission-ack",
-      metaName: "in_admission_ack",
-      department: "INSTITUTE" as Department,
-      name: "Admission inquiry acknowledgement",
-      body: "Assalam-o-Alaikum {{1}}, your admission inquiry for {{2}} is registered ({{3}}). An admission officer will call you shortly.",
-      variables: ["name", "course", "reference"],
-    },
-    {
-      key: "in-batch-reminder",
-      metaName: "in_batch_reminder",
-      department: "INSTITUTE" as Department,
-      name: "Batch starting reminder",
-      body: "Reminder: your {{1}} batch starts on {{2}}. Timings: {{3}}. Please confirm your seat.",
-      variables: ["course", "startDate", "schedule"],
-    },
-    {
-      key: "in-fee-reminder",
-      metaName: "in_fee_reminder",
-      department: "INSTITUTE" as Department,
-      name: "Fee instalment reminder",
-      body: "Hi {{1}}, your next fee instalment of {{2}} is due on {{3}}. Please visit the office or contact us to arrange payment.",
-      variables: ["name", "amount", "dueDate"],
-    },
   ];
 
   // Seeded as DRAFT, never APPROVED. These are starting points for wording,
@@ -651,11 +396,6 @@ async function seedContent() {
       title: "AI automation packages now available",
       body: "Bundle an AI chatbot with WhatsApp automation and save on the combined build. Ask the assistant for a quote.",
     },
-    {
-      department: "INSTITUTE" as Department,
-      title: "Admissions open for the next batch",
-      body: "Seats are limited across all courses. Early-bird discounts apply before the registration deadline — start an admission inquiry to reserve yours.",
-    },
   ];
 
   for (const announcement of announcements) {
@@ -669,15 +409,6 @@ async function seedContent() {
   eventStart.setHours(15, 0, 0, 0);
 
   const events = [
-    {
-      slug: "free-ai-freelancing-seminar",
-      department: "INSTITUTE" as Department,
-      title: "Free seminar: Earning online with AI",
-      summary:
-        "A free two-hour session on which AI skills are actually earning money right now, and how to get your first freelance client.",
-      location: "BITSOL Institute campus, Faisalabad",
-      startsAt: eventStart,
-    },
     {
       slug: "ai-for-business-workshop",
       department: "MARKETING" as Department,

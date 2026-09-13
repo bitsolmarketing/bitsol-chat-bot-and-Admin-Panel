@@ -1,16 +1,17 @@
-import type { Department, NotificationChannel } from "@prisma/client";
+import type { NotificationChannel } from "@prisma/client";
 import { prisma } from "./db";
 import { config } from "./config";
+import { DEPARTMENT } from "./brands";
 
 /**
  * =============================================================================
  *  Team notifications & audit logging
  * =============================================================================
  *
- *  Every lead, admission inquiry, meeting request and ticket queues a
- *  notification for the owning team and writes an audit entry. Both are
- *  best-effort: a chat must never fail because the mailer is down or the
- *  database is briefly unreachable, so failures are logged and swallowed.
+ *  Every lead, meeting request and ticket queues a notification for the team
+ *  and writes an audit entry. Both are best-effort: a chat must never fail
+ *  because the mailer is down or the database is briefly unreachable, so
+ *  failures are logged and swallowed.
  *
  *  Delivery itself (SMTP / SMS / WhatsApp) is performed by a worker reading the
  *  `notifications` table — the queue row is written here, transport is not
@@ -18,15 +19,7 @@ import { config } from "./config";
  * =============================================================================
  */
 
-/** Inbox that owns new records for a department. */
-function recipientFor(department: Department): string | undefined {
-  return department === "MARKETING"
-    ? config.routing.salesEmail ?? config.mail.from
-    : config.routing.admissionsEmail ?? config.mail.from;
-}
-
 export interface TeamNotification {
-  department: Department;
   subject: string;
   body: string;
   /** Deep link into the admin console, e.g. `/admin/crm/leads/<id>`. */
@@ -34,15 +27,15 @@ export interface TeamNotification {
   channel?: NotificationChannel;
 }
 
-/** Queue a notification for the team that owns this department. */
+/** Queue a notification for the sales team's inbox. */
 export async function notifyTeam(notification: TeamNotification): Promise<void> {
-  const to = recipientFor(notification.department);
+  const to = config.routing.salesEmail ?? config.mail.from;
   if (!to) return;
 
   try {
     await prisma.notification.create({
       data: {
-        department: notification.department,
+        department: DEPARTMENT,
         channel: notification.channel ?? "EMAIL",
         to,
         subject: notification.subject,
@@ -57,7 +50,6 @@ export async function notifyTeam(notification: TeamNotification): Promise<void> 
 
 export interface AuditEntry {
   action: string;
-  department?: Department | null;
   entity?: string;
   entityId?: string;
   message?: string;
@@ -75,7 +67,7 @@ export async function logEvent(entry: AuditEntry): Promise<void> {
       data: {
         level: entry.level ?? "INFO",
         action: entry.action,
-        department: entry.department ?? null,
+        department: DEPARTMENT,
         entity: entry.entity,
         entityId: entry.entityId,
         message: entry.message,

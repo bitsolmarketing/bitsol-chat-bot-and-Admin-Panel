@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { BRANDS } from "@/lib/brands";
+import { BRAND, DEPARTMENT } from "@/lib/brands";
 import { generateReference } from "@/lib/utils";
 import { logEvent, notifyTeam } from "@/lib/notify";
 import { clientIp, conversationIdFor, created, failed, invalid, throttle } from "@/lib/api";
@@ -9,15 +9,8 @@ import { clientIp, conversationIdFor, created, failed, invalid, throttle } from 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Consultation / meeting booking — used by both businesses.
- *
- * BITSOL Marketing books free consultations; BITSOL Institute books admission
- * counselling sessions and campus visits. The department decides which team is
- * notified and which reference prefix is issued.
- */
+/** Free consultation booking — Office, Zoom, Google Meet or a WhatsApp call. */
 const bodySchema = z.object({
-  department: z.enum(["MARKETING", "INSTITUTE"]),
   name: z.string().min(2).max(120),
   phone: z.string().min(7).max(32),
   email: z.string().email().max(160).optional().or(z.literal("")),
@@ -45,8 +38,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return invalid();
 
   const data = parsed.data;
-  const department = data.department;
-  const reference = generateReference("MTG", department);
+  const reference = generateReference("MTG");
 
   // Reject dates in the past — a booking for last Tuesday helps nobody.
   const date = new Date(`${data.preferredDate}T00:00:00Z`);
@@ -60,7 +52,7 @@ export async function POST(req: NextRequest) {
     const meeting = await prisma.meeting.create({
       data: {
         reference,
-        department,
+        department: DEPARTMENT,
         name: data.name,
         phone: data.phone,
         email: data.email || null,
@@ -76,7 +68,6 @@ export async function POST(req: NextRequest) {
     });
 
     await notifyTeam({
-      department,
       subject: `Meeting request ${reference} — ${data.name} (${data.preferredDate} ${data.preferredTime})`,
       body: [
         `Reference: ${reference}`,
@@ -95,7 +86,6 @@ export async function POST(req: NextRequest) {
 
     await logEvent({
       action: "meeting.requested",
-      department,
       entity: "Meeting",
       entityId: meeting.id,
       message: `Meeting ${reference} requested from the assistant.`,
@@ -105,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     return created(
       reference,
-      `Your meeting request **${reference}** is booked for **${data.preferredDate} at ${data.preferredTime}** via **${MODE_LABEL[data.mode]}**. Our team will confirm on ${data.phone}. If anything changes, call ${BRANDS[department].contact.phone}.`
+      `Your meeting request **${reference}** is booked for **${data.preferredDate} at ${data.preferredTime}** via **${MODE_LABEL[data.mode]}**. Our team will confirm on ${data.phone}. If anything changes, call ${BRAND.contact.phone}.`
     );
   } catch (error) {
     console.error("[meetings] create failed:", error);

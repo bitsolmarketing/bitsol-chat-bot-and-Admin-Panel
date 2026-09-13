@@ -1,57 +1,46 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { dashboardStats, safeQuery, scope, sessionDepartment } from "@/lib/admin/queries";
+import { dashboardStats, OWN, OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import { DbNotice, PageHeader, StatCard } from "@/components/admin/ui";
 import { Card } from "@/components/ui/card";
 import { MessagesSquare, Percent, Timer, TrendingUp } from "lucide-react";
+import { findService } from "@/data/marketing/services";
 import { humanise } from "@/lib/utils";
-import type { Department } from "@/lib/brands";
 
 export const metadata = { title: "Reports & Analytics" };
 
 const DAYS = 30;
 
 export default async function ReportsPage() {
-  const session = await requireAdmin("/admin/reports");
-  const department = sessionDepartment(session) as Department | null;
+  await requireAdmin("/admin/reports");
   const since = new Date();
   since.setDate(since.getDate() - DAYS);
   since.setHours(0, 0, 0, 0);
 
   const [{ data: stats, error: statsError }, { data: trends, error: trendError }] =
     await Promise.all([
-      dashboardStats(session),
+      dashboardStats(),
       safeQuery(
         async () => {
-          const [conversations, leadStages, admissionStages, ticketStatuses, latency] =
+          const [conversations, leadStages, leadSources, ticketStatuses, latency] =
             await Promise.all([
               prisma.conversation.findMany({
-                where: { ...scope(session), createdAt: { gte: since } },
+                where: { ...OWN_OR_GLOBAL, createdAt: { gte: since } },
                 select: { createdAt: true },
               }),
-              department === "INSTITUTE"
-                ? Promise.resolve([])
-                : prisma.marketingLead.groupBy({
-                    by: ["stage"],
-                    _count: { _all: true },
-                  }),
-              department === "MARKETING"
-                ? Promise.resolve([])
-                : prisma.admission.groupBy({
-                    by: ["stage"],
-                    _count: { _all: true },
-                  }),
+              prisma.marketingLead.groupBy({ by: ["stage"], _count: { _all: true } }),
+              prisma.marketingLead.groupBy({ by: ["source"], _count: { _all: true } }),
               prisma.ticket.groupBy({
                 by: ["status"],
                 _count: { _all: true },
-                where: scope(session),
+                where: OWN,
               }),
               prisma.message.aggregate({
                 where: {
                   role: "ASSISTANT",
                   createdAt: { gte: since },
                   latencyMs: { not: null },
-                  ...(department ? { department } : {}),
+                  ...OWN_OR_GLOBAL,
                 },
                 _avg: { latencyMs: true },
               }),
@@ -59,7 +48,7 @@ export default async function ReportsPage() {
           return {
             conversations,
             leadStages,
-            admissionStages,
+            leadSources,
             ticketStatuses,
             avgLatency: Math.round(latency._avg.latencyMs ?? 0),
           };
@@ -67,14 +56,14 @@ export default async function ReportsPage() {
         {
           conversations: [] as Array<{ createdAt: Date }>,
           leadStages: [] as Array<{ stage: string; _count: { _all: number } }>,
-          admissionStages: [] as Array<{ stage: string; _count: { _all: number } }>,
+          leadSources: [] as Array<{ source: string; _count: { _all: number } }>,
           ticketStatuses: [] as Array<{ status: string; _count: { _all: number } }>,
           avgLatency: 0,
         }
       ),
     ]);
 
-  // Bucket conversations per day for the sparkline.
+  // Bucket conversations per day for the bar chart.
   const buckets = new Map<string, number>();
   for (let i = DAYS - 1; i >= 0; i--) {
     const day = new Date();
@@ -91,6 +80,7 @@ export default async function ReportsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Insights"
         title="Reports & Analytics"
         description={`Performance across the last ${DAYS} days.`}
       />
@@ -105,9 +95,9 @@ export default async function ReportsPage() {
           icon={MessagesSquare}
         />
         <StatCard
-          label="Conversion rate"
+          label="Win rate"
           value={`${stats.conversionRate}%`}
-          hint="Won + enrolled ÷ pipeline"
+          hint="Won ÷ all leads"
           icon={TrendingUp}
         />
         <StatCard
@@ -123,14 +113,14 @@ export default async function ReportsPage() {
         />
       </div>
 
-      <Card className="mb-6 p-5">
-        <h2 className="mb-4 text-sm font-semibold">Conversations per day</h2>
-        <div className="flex h-32 items-end gap-[3px]">
+      <Card className="mb-6 p-6">
+        <h2 className="mb-5 text-sm font-semibold">Conversations per day</h2>
+        <div className="flex h-36 items-end gap-[3px]">
           {series.map(([date, count]) => (
             <div
               key={date}
               title={`${date}: ${count}`}
-              className="flex-1 rounded-t bg-primary/70 transition-colors hover:bg-primary"
+              className="bg-brand flex-1 rounded-t opacity-75 transition-opacity hover:opacity-100"
               style={{ height: `${Math.max(2, (count / peak) * 100)}%` }}
             />
           ))}
@@ -141,21 +131,22 @@ export default async function ReportsPage() {
         </div>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {trends.leadStages.length > 0 && (
-          <Breakdown
-            title="Sales pipeline"
-            department="MARKETING"
-            rows={trends.leadStages.map((r) => ({ label: r.stage, count: r._count._all }))}
-          />
-        )}
-        {trends.admissionStages.length > 0 && (
-          <Breakdown
-            title="Admissions pipeline"
-            department="INSTITUTE"
-            rows={trends.admissionStages.map((r) => ({ label: r.stage, count: r._count._all }))}
-          />
-        )}
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <Breakdown
+          title="Sales pipeline"
+          rows={trends.leadStages.map((r) => ({ label: r.stage, count: r._count._all }))}
+        />
+        <Breakdown
+          title="Lead sources"
+          rows={trends.leadSources.map((r) => ({ label: r.source, count: r._count._all }))}
+        />
+        <Breakdown
+          title="Most requested services"
+          rows={stats.popularServices.map((r) => ({
+            label: findService(r.label)?.name ?? r.label,
+            count: r.count,
+          }))}
+        />
         <Breakdown
           title="Support tickets"
           rows={trends.ticketStatuses.map((r) => ({ label: r.status, count: r._count._all }))}
@@ -167,31 +158,29 @@ export default async function ReportsPage() {
 
 function Breakdown({
   title,
-  department,
   rows,
 }: {
   title: string;
-  department?: Department;
   rows: Array<{ label: string; count: number }>;
 }) {
   const total = rows.reduce((sum, row) => sum + row.count, 0) || 1;
 
   return (
-    <Card data-department={department} className="p-5">
-      <h2 className="mb-3 text-sm font-semibold">{title}</h2>
+    <Card className="p-6">
+      <h2 className="mb-4 text-sm font-semibold">{title}</h2>
       {rows.length ? (
-        <ul className="space-y-2.5">
+        <ul className="space-y-3">
           {rows.map((row) => (
             <li key={row.label}>
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+              <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
                 <span className="truncate">{humanise(row.label)}</span>
-                <span className="shrink-0 text-muted-foreground">
+                <span className="shrink-0 tabular-nums text-muted-foreground">
                   {row.count} · {Math.round((row.count / total) * 100)}%
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                 <div
-                  className="h-full rounded-full bg-primary"
+                  className="bg-brand h-full rounded-full"
                   style={{ width: `${(row.count / total) * 100}%` }}
                 />
               </div>

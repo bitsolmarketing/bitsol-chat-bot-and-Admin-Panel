@@ -2,38 +2,38 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN, safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
   PageHeader,
   StatCard,
   StatusBadge,
 } from "@/components/admin/ui";
 import { CalendarClock, CheckCircle2, TimerReset } from "lucide-react";
-import { formatDateTime, truncate } from "@/lib/utils";
+import { formatDateTime, humanise, truncate } from "@/lib/utils";
 
 export const metadata = { title: "Follow-ups" };
 
 /** Where a timeline entry links back to, per entity type. */
 const LINKS: Record<string, (id: string) => string | null> = {
   MarketingLead: (id) => `/admin/crm/leads/${id}`,
-  Admission: (id) => `/admin/crm/admissions/${id}`,
   Ticket: () => "/admin/support/tickets",
   Customer: () => "/admin/crm/customers",
-  Student: () => "/admin/crm/students",
   Project: () => "/admin/catalogue/projects",
 };
 
+/** `MarketingLead` is a model name; people call it a lead. */
+const RECORD_LABELS: Record<string, string> = { MarketingLead: "Lead" };
+
 export default async function FollowUpsPage() {
-  const session = await requireAdmin("/admin/crm/follow-ups");
+  await requireAdmin("/admin/crm/follow-ups");
   const now = new Date();
 
   const { data, error } = await safeQuery(
     async () => {
       const base: Prisma.CrmActivityWhereInput = {
-        ...scope(session),
+        ...OWN,
         type: { in: ["FOLLOW_UP", "REMINDER"] },
         completedAt: null,
       };
@@ -47,7 +47,7 @@ export default async function FollowUpsPage() {
         }),
         prisma.crmActivity.count({ where: { ...base, dueAt: { lt: now } } }),
         prisma.crmActivity.count({
-          where: { ...scope(session), completedAt: { not: null } },
+          where: { ...OWN, completedAt: { not: null } },
         }),
       ]);
       return { pending, overdue, completed };
@@ -58,8 +58,9 @@ export default async function FollowUpsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Clients"
         title="Follow-ups & reminders"
-        description="Everything your team promised to do next, across both pipelines. Overdue items float to the top."
+        description="Everything your team promised to do next. Overdue items float to the top."
       />
 
       {error && <DbNotice error={error} />}
@@ -89,10 +90,6 @@ export default async function FollowUpsPage() {
           },
           { header: "Type", cell: (row) => <StatusBadge value={row.type} /> },
           {
-            header: "Business",
-            cell: (row) => <DepartmentTag department={row.department} />,
-          },
-          {
             header: "Note",
             cell: (row) => (
               <p className="max-w-md text-xs">{truncate(row.body, 140)}</p>
@@ -102,12 +99,13 @@ export default async function FollowUpsPage() {
             header: "Record",
             cell: (row) => {
               const href = LINKS[row.entityType]?.(row.entityId);
+              const label = RECORD_LABELS[row.entityType] ?? humanise(row.entityType);
               return href ? (
-                <Link href={href} className="text-xs text-primary hover:underline">
-                  {row.entityType}
+                <Link href={href} className="text-xs font-medium text-primary hover:underline">
+                  {label}
                 </Link>
               ) : (
-                <span className="text-xs text-muted-foreground">{row.entityType}</span>
+                <span className="text-xs text-muted-foreground">{label}</span>
               );
             },
           },

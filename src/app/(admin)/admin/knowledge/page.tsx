@@ -1,101 +1,47 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import {
   DataTable,
   DbNotice,
-  DepartmentTag,
+  FilterChip,
   PageHeader,
   StatCard,
 } from "@/components/admin/ui";
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { BookOpen, FileQuestion, Layers } from "lucide-react";
-import { asDepartment, BRANDS, type Department } from "@/lib/brands";
 import { formatDate, truncate } from "@/lib/utils";
 
 export const metadata = { title: "Knowledge Base" };
 
 const STATES = ["DRAFT", "PUBLISHED", "ARCHIVED"] as const;
 
-/** Shape shared by both knowledge tables, so the page renders one way. */
-interface KnowledgeRow {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-  kind: string;
-  keywords: string[];
-  state: string;
-  version: number;
-  indexedAt: Date | null;
-}
-
-interface KnowledgeView {
-  entries: KnowledgeRow[];
-  counts: Array<{ state: string; count: number }>;
-  categories: Array<{ category: string; count: number }>;
-}
-
-async function loadMarketing(category?: string): Promise<KnowledgeView> {
-  const [entries, counts, categories] = await Promise.all([
-    prisma.marketingKnowledge.findMany({
-      where: category ? { category } : undefined,
-      orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
-      take: 200,
-    }),
-    prisma.marketingKnowledge.groupBy({ by: ["state"], _count: { _all: true } }),
-    prisma.marketingKnowledge.groupBy({ by: ["category"], _count: { _all: true } }),
-  ]);
-  return {
-    entries,
-    counts: counts.map((c) => ({ state: c.state, count: c._count._all })),
-    categories: categories.map((c) => ({ category: c.category, count: c._count._all })),
-  };
-}
-
-async function loadInstitute(category?: string): Promise<KnowledgeView> {
-  const [entries, counts, categories] = await Promise.all([
-    prisma.instituteKnowledge.findMany({
-      where: category ? { category } : undefined,
-      orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
-      take: 200,
-    }),
-    prisma.instituteKnowledge.groupBy({ by: ["state"], _count: { _all: true } }),
-    prisma.instituteKnowledge.groupBy({ by: ["category"], _count: { _all: true } }),
-  ]);
-  return {
-    entries,
-    counts: counts.map((c) => ({ state: c.state, count: c._count._all })),
-    categories: categories.map((c) => ({ category: c.category, count: c._count._all })),
-  };
-}
-
-/**
- * Knowledge Base CMS.
- *
- * The two bases live in separate tables (`knowledge_base_marketing` and
- * `knowledge_base_institute`), so this page picks a delegate rather than
- * filtering one shared table — the same separation the assistant relies on.
- */
+/** Knowledge Base CMS — everything the assistant is allowed to say. */
 export default async function KnowledgePage({
   searchParams,
 }: {
-  searchParams: Promise<{ department?: string; category?: string }>;
+  searchParams: Promise<{ category?: string }>;
 }) {
-  const session = await requireAdmin("/admin/knowledge");
-  const scoped = sessionDepartment(session) as Department | null;
+  await requireAdmin("/admin/knowledge");
+  const { category } = await searchParams;
 
-  const params = await searchParams;
-  const requested = asDepartment(params.department);
-  // Scoped staff are locked to their own base; unrestricted staff can switch.
-  const department: Department = scoped ?? requested ?? "MARKETING";
-  const category = params.category;
-
-  const { data, error } = await safeQuery<KnowledgeView>(
-    // The two bases are separate Prisma models, so this branches rather than
-    // picking a delegate — a union of two model delegates isn't callable.
-    () => (department === "MARKETING" ? loadMarketing(category) : loadInstitute(category)),
+  const { data, error } = await safeQuery(
+    async () => {
+      const [entries, counts, categories] = await Promise.all([
+        prisma.marketingKnowledge.findMany({
+          where: category ? { category } : undefined,
+          orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
+          take: 200,
+        }),
+        prisma.marketingKnowledge.groupBy({ by: ["state"], _count: { _all: true } }),
+        prisma.marketingKnowledge.groupBy({ by: ["category"], _count: { _all: true } }),
+      ]);
+      return {
+        entries,
+        counts: counts.map((c) => ({ state: c.state, count: c._count._all })),
+        categories: categories.map((c) => ({ category: c.category, count: c._count._all })),
+      };
+    },
     { entries: [], counts: [], categories: [] }
   );
 
@@ -105,67 +51,29 @@ export default async function KnowledgePage({
   return (
     <>
       <PageHeader
+        eyebrow="Content"
         title="Knowledge Base"
-        department={department}
-        description={`Everything the assistant is allowed to say about ${BRANDS[department].shortName}. Answers are drawn from published entries only.`}
-        actions={
-          scoped ? undefined : (
-            <div className="flex gap-2">
-              {(["MARKETING", "INSTITUTE"] as Department[]).map((value) => (
-                <Link
-                  key={value}
-                  href={`/admin/knowledge?department=${value}`}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
-                    department === value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "bg-card hover:bg-secondary"
-                  }`}
-                >
-                  {BRANDS[value].emoji} {BRANDS[value].shortName}
-                </Link>
-              ))}
-            </div>
-          )
-        }
+        description="Everything the assistant is allowed to say about BITSOL Marketing. Answers are drawn from published entries only."
       />
 
       {error && <DbNotice error={error} />}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <StatCard label="Entries" value={total} icon={BookOpen} department={department} />
-        <StatCard label="Published" value={published} icon={FileQuestion} department={department} />
-        <StatCard
-          label="Categories"
-          value={data.categories.length}
-          icon={Layers}
-          department={department}
-        />
+        <StatCard label="Entries" value={total} icon={BookOpen} />
+        <StatCard label="Published" value={published} icon={FileQuestion} />
+        <StatCard label="Categories" value={data.categories.length} icon={Layers} />
       </div>
 
       <div className="scroll-slim mb-4 flex gap-2 overflow-x-auto pb-1">
-        <Link
-          href={`/admin/knowledge?department=${department}`}
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
-            !category ? "border-primary bg-primary text-primary-foreground" : "bg-card"
-          }`}
-        >
-          All {total}
-        </Link>
+        <FilterChip href="/admin/knowledge" label="All" count={total} active={!category} />
         {data.categories.map((group) => (
-          <Link
+          <FilterChip
             key={group.category}
-            href={`/admin/knowledge?department=${department}&category=${encodeURIComponent(
-              group.category
-            )}`}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${
-              category === group.category
-                ? "border-primary bg-primary text-primary-foreground"
-                : "bg-card hover:bg-secondary"
-            }`}
-          >
-            {group.category}
-            <span className="ml-1.5 opacity-70">{group.count}</span>
-          </Link>
+            href={`/admin/knowledge?category=${encodeURIComponent(group.category)}`}
+            label={group.category}
+            count={group.count}
+            active={category === group.category}
+          />
         ))}
       </div>
 
@@ -206,9 +114,7 @@ export default async function KnowledgePage({
             header: "State",
             cell: (row) => (
               <StatusSelect
-                entity={
-                  department === "MARKETING" ? "knowledge-marketing" : "knowledge-institute"
-                }
+                entity="knowledge"
                 id={row.id}
                 field="state"
                 value={row.state}
@@ -224,10 +130,6 @@ export default async function KnowledgePage({
                 <p>{row.indexedAt ? `Indexed ${formatDate(row.indexedAt)}` : "Not indexed"}</p>
               </div>
             ),
-          },
-          {
-            header: "Business",
-            cell: () => <DepartmentTag department={department} />,
           },
         ]}
       />

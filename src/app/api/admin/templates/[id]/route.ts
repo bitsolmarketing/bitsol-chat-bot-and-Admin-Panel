@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { isOwn } from "@/lib/admin/queries";
 import { logEvent } from "@/lib/notify";
 import { deleteTemplate } from "@/lib/whatsapp/templates";
 
@@ -20,8 +21,6 @@ export const dynamic = "force-dynamic";
 const patchSchema = z.object({
   /** Display name in the console. Meta never sees it. */
   name: z.string().min(1).max(120).optional(),
-  /** Which business owns the template. Null leaves it available to both. */
-  department: z.enum(["MARKETING", "INSTITUTE"]).nullable().optional(),
   /** Labels for `{{1}}`, `{{2}}`… shown in the broadcast composer. */
   variables: z.array(z.string().max(60)).max(20).optional(),
 });
@@ -46,23 +45,14 @@ export async function PATCH(
   }
 
   const template = await prisma.whatsappTemplate.findUnique({ where: { id } });
-  if (!template) return Response.json({ error: "Template not found." }, { status: 404 });
-
-  // Both the template's current owner and the business it is being handed to
-  // have to be in reach, or a department-scoped user could move a template out
-  // of the other business's list.
-  if (template.department && !canAccessDepartment(session, template.department)) {
-    return Response.json({ error: "That template belongs to the other business." }, { status: 403 });
-  }
-  if (data.department && !canAccessDepartment(session, data.department)) {
-    return Response.json({ error: "That business is not yours to assign to." }, { status: 403 });
+  if (!template || !isOwn(template.department)) {
+    return Response.json({ error: "Template not found." }, { status: 404 });
   }
 
   await prisma.whatsappTemplate.update({ where: { id }, data });
 
   await logEvent({
     action: "template.updated",
-    department: data.department ?? template.department ?? undefined,
     entity: "whatsappTemplate",
     entityId: id,
     message: `${session.name} updated the template "${template.metaName}".`,
@@ -94,10 +84,8 @@ export async function DELETE(
 
   const { id } = await params;
   const template = await prisma.whatsappTemplate.findUnique({ where: { id } });
-  if (!template) return Response.json({ error: "Template not found." }, { status: 404 });
-
-  if (template.department && !canAccessDepartment(session, template.department)) {
-    return Response.json({ error: "That template belongs to the other business." }, { status: 403 });
+  if (!template || !isOwn(template.department)) {
+    return Response.json({ error: "Template not found." }, { status: 404 });
   }
 
   if (template.metaId) {
@@ -117,7 +105,6 @@ export async function DELETE(
   await logEvent({
     level: "WARN",
     action: "template.deleted",
-    department: template.department ?? undefined,
     entity: "whatsappTemplate",
     entityId: id,
     message: `${session.name} deleted the template "${template.metaName}" (${count} language variant${count === 1 ? "" : "s"}).`,

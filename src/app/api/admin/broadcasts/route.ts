@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { canAccessAdmin, canAccessDepartment } from "@/lib/auth";
+import { canAccessAdmin } from "@/lib/auth";
+import { DEPARTMENT } from "@/lib/brands";
+import { isOwn } from "@/lib/admin/queries";
 import { logEvent } from "@/lib/notify";
 import { generateReference } from "@/lib/utils";
 import { parseNumberList } from "@/lib/whatsapp/numbers";
@@ -40,7 +42,6 @@ const parameterSchema = z.discriminatedUnion("kind", [
 
 const schema = z.object({
   title: z.string().min(1).max(160),
-  department: z.enum(["MARKETING", "INSTITUTE"]),
   templateId: z.string().min(1),
   /** One entry per `{{n}}` in the template body, in order. */
   parameters: z.array(parameterSchema).max(20).default([]),
@@ -75,17 +76,10 @@ export async function POST(req: NextRequest) {
   }
   const draft = parsed.data;
 
-  if (!canAccessDepartment(session, draft.department)) {
-    return Response.json(
-      { error: "That business is not yours to broadcast to." },
-      { status: 403 }
-    );
-  }
-
   const template = await prisma.whatsappTemplate.findUnique({
     where: { id: draft.templateId },
   });
-  if (!template) {
+  if (!template || !isOwn(template.department)) {
     return Response.json({ error: "Template not found." }, { status: 404 });
   }
 
@@ -99,13 +93,6 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (template.department && template.department !== draft.department) {
-    return Response.json(
-      { error: "That template belongs to the other business." },
-      { status: 400 }
-    );
-  }
-
   const sources = parseParameters(draft.parameters);
   const valid = validateParameters(template.body, sources);
   if (!valid.ok) return Response.json({ error: valid.error }, { status: 400 });
@@ -145,13 +132,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    waIds = await importContacts(list.valid, draft.department);
+    waIds = await importContacts(list.valid);
   }
 
   const audience = {
     kind: draft.audience.kind,
     waIds,
-    department: draft.department,
     includeUnrouted: draft.audience.includeUnrouted,
     activeWithinDays: draft.audience.activeWithinDays,
     limit: draft.audience.limit,
@@ -174,8 +160,8 @@ export async function POST(req: NextRequest) {
 
   const broadcast = await prisma.broadcast.create({
     data: {
-      reference: generateReference("BCAST", draft.department),
-      department: draft.department,
+      reference: generateReference("BCAST"),
+      department: DEPARTMENT,
       channel: "WHATSAPP",
       status: scheduledAt ? "SCHEDULED" : "DRAFT",
       title: draft.title,
@@ -208,7 +194,6 @@ export async function POST(req: NextRequest) {
 
   await logEvent({
     action: "broadcast.created",
-    department: draft.department,
     entity: "broadcast",
     entityId: broadcast.id,
     message: `${session.name} drafted the broadcast "${draft.title}" to ${prepared.recipients} contacts.`,

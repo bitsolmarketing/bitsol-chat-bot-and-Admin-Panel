@@ -6,7 +6,6 @@ import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, Textarea } from "@/components/ui/field";
-import type { Department } from "@/lib/brands";
 
 const TYPES = ["NOTE", "FOLLOW_UP", "REMINDER", "CALL", "EMAIL", "WHATSAPP", "MEETING"] as const;
 
@@ -20,11 +19,9 @@ const TYPES = ["NOTE", "FOLLOW_UP", "REMINDER", "CALL", "EMAIL", "WHATSAPP", "ME
 export function ActivityComposer({
   entityType,
   entityId,
-  department,
 }: {
-  entityType: "MarketingLead" | "Admission" | "Customer" | "Student" | "Ticket" | "Project";
+  entityType: "MarketingLead" | "Customer" | "Ticket" | "Project";
   entityId: string;
-  department: Department;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -50,7 +47,6 @@ export function ActivityComposer({
         body: JSON.stringify({
           entityType,
           entityId,
-          department,
           type,
           body: body.trim(),
           dueAt: needsDueDate && dueAt ? dueAt : undefined,

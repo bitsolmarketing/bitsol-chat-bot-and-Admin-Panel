@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/redis";
 import { logEvent, notifyTeam } from "@/lib/notify";
 import { generateReference, shortId } from "@/lib/utils";
 import { detectLanguage, type Language } from "@/lib/i18n";
-import { asDepartment, BRANDS, type Department } from "@/lib/brands";
+import { BRAND, DEPARTMENT } from "@/lib/brands";
 import {
   detectAction,
   planAssistantTurn,
@@ -15,29 +15,25 @@ import {
   type ChatTurn,
 } from "@/lib/ai";
 import { findService } from "@/data/marketing/services";
-import { findCourse } from "@/data/institute/courses";
 import { markAsRead, sendButtons, sendList, sendText, toDisplayPhone } from "./client";
 import {
   advanceCapture,
   asCaptureState,
   beginCapture,
-  flowFor,
   isCaptureStale,
   seedFromWaId,
-  type CaptureFlow,
   type CapturePrompt,
   type CaptureState,
 } from "./capture";
 import {
   ACTION_BUTTON_PREFIX,
-  DEPARTMENT_BUTTON_PREFIX,
   busyNotice,
   captureCancelled,
   captureConfirmation,
-  departmentGreeting,
   escalationNotice,
   mediaAcknowledgement,
   optOutConfirmation,
+  quickActions,
   welcomeMessage,
 } from "./copy";
 import type { InboundMessage } from "./types";
@@ -48,9 +44,9 @@ import type { InboundMessage } from "./types";
  * =============================================================================
  *
  *  The WhatsApp equivalent of `app/api/chat/route.ts`. It reuses the exact same
- *  brain — `planAssistantTurn` routes the business, retrieves from the correct
- *  knowledge base and builds the system prompt — so an answer given on WhatsApp
- *  and the same answer given in the web widget cannot drift apart.
+ *  brain — `planAssistantTurn` retrieves from the knowledge base and builds the
+ *  system prompt — so an answer given on WhatsApp and the same answer given in
+ *  the web widget cannot drift apart.
  *
  *  What differs is everything around the model:
  *
@@ -84,6 +80,14 @@ const THREAD_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MENU_WORDS = ["menu", "start", "restart", "hi", "hello", "hey", "salam", "assalam o alaikum", "assalamualaikum", "aoa", "السلام علیکم", "مینو"];
 const STOP_WORDS = ["stop", "unsubscribe", "opt out", "band karo"];
 
+/**
+ * Button ids from the old two-business welcome menu (`dept:MARKETING`,
+ * `dept:INSTITUTE`). Those messages are still sitting in people's chats, and a
+ * tap on one should land somewhere sensible rather than reach the model as
+ * "Institute".
+ */
+const LEGACY_DEPARTMENT_BUTTON_PREFIX = "dept:";
+
 /** Handle one inbound customer message end to end. */
 export async function handleInbound(message: InboundMessage): Promise<void> {
   try {
@@ -116,12 +120,12 @@ async function route(message: InboundMessage): Promise<void> {
   // Staff can silence a number without disconnecting the integration.
   if (contact.isBlocked) return;
 
-  const conversation = await resolveConversation(waId, phone, contact.profileName, contact.department);
+  const conversation = await resolveConversation(waId, phone, contact.profileName);
 
   // Idempotency gate. Meta redelivers until it sees a 200, and this insert is
   // the thing that makes a redelivery harmless: the second attempt violates the
   // unique index on `externalId` and we stop before answering twice.
-  const stored = await recordInbound(conversation.id, message, conversation.department);
+  const stored = await recordInbound(conversation.id, message);
   if (!stored) return;
 
   void markAsRead(message.id).catch(() => {});
@@ -132,7 +136,6 @@ async function route(message: InboundMessage): Promise<void> {
     phone,
     language,
     conversationId: conversation.id,
-    department: conversation.department,
     profileName: contact.profileName ?? undefined,
   };
 
@@ -159,13 +162,12 @@ async function route(message: InboundMessage): Promise<void> {
     return;
   }
 
-  // --- Menu, department picking and switching -------------------------------
-  if (answer.startsWith(DEPARTMENT_BUTTON_PREFIX)) {
-    const picked = asDepartment(answer.slice(DEPARTMENT_BUTTON_PREFIX.length));
-    if (picked) return greet(context, picked);
-  }
-
-  if (answer === `${ACTION_BUTTON_PREFIX}menu` || MENU_WORDS.includes(lowered)) {
+  // --- Menu -----------------------------------------------------------------
+  if (
+    answer === `${ACTION_BUTTON_PREFIX}menu` ||
+    answer.startsWith(LEGACY_DEPARTMENT_BUTTON_PREFIX) ||
+    MENU_WORDS.includes(lowered)
+  ) {
     await clearCapture(conversation.id);
     return sendMenu(context);
   }
@@ -177,46 +179,28 @@ async function route(message: InboundMessage): Promise<void> {
   }
   if (active) await clearCapture(conversation.id);
 
-  // --- Work out which business this belongs to ------------------------------
-  const history = await loadHistory(conversation.id);
-  const plan = planAssistantTurn(history, { department: context.department });
-  const department = plan.department;
-
-  if (!department) return sendMenu(context);
-
-  if (department !== context.department) {
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { department },
-    });
-    await prisma.whatsappContact.update({ where: { waId }, data: { department } });
-    context.department = department;
-  }
-
   // --- Explicit "start the form" tap ----------------------------------------
   if (answer === `${ACTION_BUTTON_PREFIX}capture`) {
-    return startCapture(context, flowFor(department));
+    return startCapture(context);
   }
 
   // --- Human handoff --------------------------------------------------------
   if (answer === `${ACTION_BUTTON_PREFIX}human` || shouldEscalate(message.text)) {
-    return escalate(context, department, message.text);
+    return escalate(context, message.text);
   }
 
   // --- Intent that deserves a structured capture ----------------------------
-  const action = detectAction(message.text, department);
+  const action = detectAction(message.text);
   if (action?.kind === "QUOTE_FORM" || action?.kind === "MEETING_FORM") {
-    return startCapture(context, "LEAD", action.subject);
-  }
-  if (action?.kind === "ADMISSION_FORM" || action?.kind === "CAREER_FORM") {
-    return startCapture(context, "ADMISSION", action.subject);
+    return startCapture(context, action.subject);
   }
   if (action?.kind === "SUPPORT_FORM") {
-    return escalate(context, department, message.text);
+    return escalate(context, message.text);
   }
 
   // --- Ordinary question: answer it with the same brain as the web chat -----
-  await answerWithAssistant(context, history, plan);
+  const history = await loadHistory(conversation.id);
+  await answerWithAssistant(context, history, planAssistantTurn(history));
 }
 
 // ------------------------------------------------------------------ Context --
@@ -226,7 +210,6 @@ interface Context {
   phone: string;
   language: Language;
   conversationId: string;
-  department: Department | null;
   profileName?: string;
 }
 
@@ -244,6 +227,7 @@ async function upsertContact(message: InboundMessage, phone: string) {
       waId: message.waId,
       phone,
       profileName: message.profileName,
+      department: DEPARTMENT,
       lastInboundAt: message.timestamp,
     },
   });
@@ -253,19 +237,23 @@ async function upsertContact(message: InboundMessage, phone: string) {
  * Find the live thread for this number, or open a new one.
  *
  * Reusing a recent conversation is what gives WhatsApp genuine memory: the
- * assistant recalls the course discussed an hour ago, and the CRM shows one
+ * assistant recalls the service discussed an hour ago, and the CRM shows one
  * coherent transcript instead of a row per message.
+ *
+ * A thread that belonged to the retired BITSOL Institute is never reused — the
+ * console hides it, so continuing it would file new messages where nobody on
+ * the team can see them.
  */
-async function resolveConversation(
-  waId: string,
-  phone: string,
-  profileName: string | null,
-  department: Department | null
-) {
+async function resolveConversation(waId: string, phone: string, profileName: string | null) {
   const since = new Date(Date.now() - THREAD_WINDOW_MS);
 
   const existing = await prisma.conversation.findFirst({
-    where: { channel: "WHATSAPP", contactPhone: phone, updatedAt: { gte: since } },
+    where: {
+      channel: "WHATSAPP",
+      contactPhone: phone,
+      updatedAt: { gte: since },
+      OR: [{ department: DEPARTMENT }, { department: null }],
+    },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -287,7 +275,7 @@ async function resolveConversation(
       channel: "WHATSAPP",
       contactPhone: phone,
       contactName: profileName,
-      department,
+      department: DEPARTMENT,
       title: profileName ? `WhatsApp · ${profileName}` : `WhatsApp · ${phone}`,
     },
   });
@@ -299,11 +287,7 @@ async function resolveConversation(
  * Returns false when the id is already present, which means this is a webhook
  * redelivery of something already answered.
  */
-async function recordInbound(
-  conversationId: string,
-  message: InboundMessage,
-  department: Department | null
-): Promise<boolean> {
+async function recordInbound(conversationId: string, message: InboundMessage): Promise<boolean> {
   const content =
     message.text ||
     (message.kind === "media" ? `[${message.mediaKind ?? "attachment"}]` : "[unsupported message]");
@@ -314,7 +298,7 @@ async function recordInbound(
         conversationId,
         role: "USER",
         content,
-        department,
+        department: DEPARTMENT,
         language: LANGUAGE_MAP[detectLanguage(message.text)],
         externalId: message.id,
       },
@@ -385,7 +369,7 @@ async function say(
         conversationId: context.conversationId,
         role: "ASSISTANT",
         content: text,
-        department: context.department,
+        department: DEPARTMENT,
         language: LANGUAGE_MAP[context.language],
         externalId: result.messageId,
       },
@@ -414,7 +398,6 @@ async function say(
   await logEvent({
     level: "ERROR",
     action: "whatsapp.send.failed",
-    department: context.department,
     entity: "WhatsappContact",
     entityId: context.waId,
     message: result.error ?? "Unknown error sending to the WhatsApp Cloud API.",
@@ -430,20 +413,6 @@ async function sendMenu(context: Context): Promise<void> {
   await say(context, welcome.text, { buttons: welcome.buttons, footer: welcome.footer });
 }
 
-async function greet(context: Context, department: Department): Promise<void> {
-  await prisma.conversation.update({
-    where: { id: context.conversationId },
-    data: { department, capture: Prisma.DbNull },
-  });
-  await prisma.whatsappContact
-    .update({ where: { waId: context.waId }, data: { department } })
-    .catch(() => {});
-
-  context.department = department;
-  const greeting = departmentGreeting(department, context.language);
-  await say(context, greeting.text, { buttons: greeting.buttons });
-}
-
 /** Generate an answer with the shared assistant brain and send it. */
 async function answerWithAssistant(
   context: Context,
@@ -455,48 +424,33 @@ async function answerWithAssistant(
     for await (const chunk of streamAssistantReply(history, plan)) text += chunk;
   } catch (error) {
     console.error("[whatsapp] model error:", error);
-    await say(context, busyNotice(context.department, context.language));
+    await say(context, busyNotice(context.language));
     return;
   }
 
   if (!text.trim()) {
-    await say(context, busyNotice(context.department, context.language));
+    await say(context, busyNotice(context.language));
     return;
   }
 
   // The chips under an answer are what turn a question into a lead — without
   // them the visitor has to know to type "I want a quote".
-  const buttons = context.department
-    ? departmentGreeting(context.department, context.language).buttons
-    : undefined;
-
-  await say(context, text, { buttons });
+  await say(context, text, { buttons: quickActions(context.language) });
 }
 
 // ---------------------------------------------------------------- Capture ---
 
-async function startCapture(
-  context: Context,
-  flow: CaptureFlow,
-  subject?: string
-): Promise<void> {
-  // Pre-fill what we already know: the catalogue item they asked about, and
-  // their WhatsApp profile name. Every pre-filled field is a question skipped.
+async function startCapture(context: Context, subject?: string): Promise<void> {
+  // Pre-fill what we already know: the service they asked about. Every
+  // pre-filled field is a question skipped.
   const seed: Record<string, string> = {};
-  if (subject) {
-    const service = findService(subject);
-    const course = findCourse(subject);
-    if (flow === "LEAD" && service) {
-      seed.serviceGroup = service.group;
-      seed.service = service.slug;
-    }
-    if (flow === "ADMISSION" && course) {
-      seed.courseGroup = course.group;
-      seed.course = course.slug;
-    }
+  const service = subject ? findService(subject) : undefined;
+  if (service) {
+    seed.serviceGroup = service.group;
+    seed.service = service.slug;
   }
 
-  const outcome = beginCapture(flow, context.language, seed);
+  const outcome = beginCapture("LEAD", context.language, seed);
   if (outcome.status !== "ask") return;
 
   await saveCapture(context.conversationId, outcome.state);
@@ -529,7 +483,7 @@ async function continueCapture(
   }
 
   await clearCapture(context.conversationId);
-  await completeCapture(context, state.flow, outcome.answers);
+  await completeCapture(context, outcome.answers);
 }
 
 async function saveCapture(conversationId: string, state: CaptureState): Promise<void> {
@@ -548,30 +502,23 @@ async function clearCapture(conversationId: string): Promise<void> {
 /** Write the finished capture into the CRM and confirm it to the customer. */
 async function completeCapture(
   context: Context,
-  flow: CaptureFlow,
   answers: Record<string, string>
 ): Promise<void> {
-  const department: Department = flow === "LEAD" ? "MARKETING" : "INSTITUTE";
-  context.department = department;
-
-  const created =
-    flow === "LEAD"
-      ? await createLead(context, answers)
-      : await createAdmission(context, answers);
+  const created = await createLead(context, answers);
 
   if (!created) {
-    await say(context, busyNotice(department, context.language));
+    await say(context, busyNotice(context.language));
     return;
   }
 
   await say(
     context,
-    captureConfirmation(department, context.language, {
+    captureConfirmation(context.language, {
       name: created.name,
       reference: created.reference,
       phone: created.phone,
     }),
-    { buttons: departmentGreeting(department, context.language).buttons }
+    { buttons: quickActions(context.language) }
   );
 }
 
@@ -586,7 +533,7 @@ async function createLead(
   context: Context,
   answers: Record<string, string>
 ): Promise<CreatedRecord | null> {
-  const reference = generateReference("LEAD", "MARKETING");
+  const reference = generateReference("LEAD");
   const service = answers.service ? findService(answers.service) : undefined;
   const name = answers.name || context.profileName || context.phone;
   const phone = answers.phone || context.phone;
@@ -621,7 +568,6 @@ async function createLead(
     });
 
     await notifyTeam({
-      department: "MARKETING",
       subject: `New WhatsApp lead ${reference} — ${name}${answers.company ? ` (${answers.company})` : ""}`,
       body: [
         `Reference: ${reference}`,
@@ -643,7 +589,6 @@ async function createLead(
 
     await logEvent({
       action: "lead.created",
-      department: "MARKETING",
       entity: "MarketingLead",
       entityId: lead.id,
       message: `Lead ${reference} captured on WhatsApp from ${context.phone}.`,
@@ -657,92 +602,16 @@ async function createLead(
   }
 }
 
-async function createAdmission(
-  context: Context,
-  answers: Record<string, string>
-): Promise<CreatedRecord | null> {
-  const reference = generateReference("ADM", "INSTITUTE");
-  const course = answers.course ? findCourse(answers.course) : undefined;
-  const name = answers.studentName || context.profileName || context.phone;
-  const phone = answers.phone || context.phone;
-
-  try {
-    const courseRecord = course
-      ? await prisma.course
-          .findUnique({ where: { slug: course.slug }, select: { id: true } })
-          .catch(() => null)
-      : null;
-
-    const admission = await prisma.admission.create({
-      data: {
-        reference,
-        studentName: name,
-        phone,
-        whatsapp: context.phone,
-        qualification: answers.qualification || null,
-        city: answers.city || null,
-        courseId: courseRecord?.id ?? null,
-        courseName:
-          course?.name ??
-          (answers.courseGroup && answers.courseGroup !== "other" ? answers.courseGroup : null),
-        preferredBatch: answers.preferredBatch || null,
-        notes: answers.notes || null,
-        source: "WHATSAPP",
-        stage: "INQUIRY",
-        conversationId: context.conversationId,
-      },
-      select: { id: true },
-    });
-
-    await notifyTeam({
-      department: "INSTITUTE",
-      subject: `New WhatsApp admission inquiry ${reference} — ${name}`,
-      body: [
-        `Reference: ${reference}`,
-        `Source: WhatsApp (${context.phone})`,
-        `Student: ${name}`,
-        `Phone: ${phone}`,
-        answers.city ? `City: ${answers.city}` : null,
-        answers.qualification ? `Qualification: ${answers.qualification}` : null,
-        `Course: ${course?.name ?? answers.courseGroup ?? "Not specified"}`,
-        answers.preferredBatch ? `Preferred timing: ${answers.preferredBatch}` : null,
-        answers.notes ? `\nNotes:\n${answers.notes}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      link: `/admin/crm/admissions/${admission.id}`,
-    });
-
-    await logEvent({
-      action: "admission.created",
-      department: "INSTITUTE",
-      entity: "Admission",
-      entityId: admission.id,
-      message: `Admission inquiry ${reference} captured on WhatsApp from ${context.phone}.`,
-      metadata: { reference, channel: "WHATSAPP", course: course?.slug },
-    });
-
-    return { id: admission.id, reference, name, phone };
-  } catch (error) {
-    console.error("[whatsapp] admission create failed:", error);
-    return null;
-  }
-}
-
 // -------------------------------------------------------------- Escalation --
 
-async function escalate(
-  context: Context,
-  department: Department,
-  request: string
-): Promise<void> {
-  const reference = generateReference("TKT", department);
+async function escalate(context: Context, request: string): Promise<void> {
+  const reference = generateReference("TKT");
 
   try {
     await prisma.ticket.create({
       data: {
         reference,
-        department,
+        department: DEPARTMENT,
         category: "GENERAL",
         status: "OPEN",
         subject: "Human requested on WhatsApp",
@@ -759,7 +628,6 @@ async function escalate(
     });
 
     await notifyTeam({
-      department,
       subject: `WhatsApp handoff ${reference} — ${context.profileName ?? context.phone}`,
       body: [
         `A WhatsApp customer asked for a human.`,
@@ -771,7 +639,7 @@ async function escalate(
         `Their message:`,
         request || "—",
         ``,
-        `Reply from ${BRANDS[department].contact.whatsapp} within 24 hours, or a template message will be required.`,
+        `Reply from ${BRAND.contact.whatsapp} within 24 hours, or a template message will be required.`,
       ]
         .filter((line) => line !== null)
         .join("\n"),
@@ -780,7 +648,6 @@ async function escalate(
 
     await logEvent({
       action: "chat.escalated",
-      department,
       entity: "Ticket",
       entityId: reference,
       message: `WhatsApp conversation handed to a human (${context.phone}).`,
@@ -790,7 +657,7 @@ async function escalate(
     console.error("[whatsapp] escalation failed:", error);
   }
 
-  await say(context, escalationNotice(department, context.language, reference));
+  await say(context, escalationNotice(context.language, reference));
 }
 
 /** Whether the bot should reply at all — the kill switch on the integration. */

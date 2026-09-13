@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * BITSOL Marketing — lead capture.
+ * Lead capture.
  *
  * Collects the fields from the brief (name, company, phone, email, business,
  * budget, timeline, requirements), generates a lead reference, stores it in the
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return invalid();
 
   const data = parsed.data;
-  const reference = generateReference("LEAD", "MARKETING");
+  const reference = generateReference("LEAD");
   const service = data.service ? findService(data.service) : undefined;
 
   try {
@@ -62,7 +62,6 @@ export async function POST(req: NextRequest) {
     });
 
     await notifyTeam({
-      department: "MARKETING",
       subject: `New lead ${reference} — ${data.name}${data.company ? ` (${data.company})` : ""}`,
       body: [
         `Reference: ${reference}`,
@@ -85,7 +84,6 @@ export async function POST(req: NextRequest) {
 
     await logEvent({
       action: "lead.created",
-      department: "MARKETING",
       entity: "MarketingLead",
       entityId: lead.id,
       message: `Lead ${reference} captured from the assistant.`,

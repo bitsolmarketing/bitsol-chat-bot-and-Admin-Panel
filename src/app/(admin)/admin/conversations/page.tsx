@@ -2,12 +2,11 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, scope } from "@/lib/admin/queries";
+import { OWN_OR_GLOBAL, safeQuery } from "@/lib/admin/queries";
 import {
   ChannelBadge,
   DataTable,
   DbNotice,
-  DepartmentTag,
   FilterChip,
   PageHeader,
   StatCard,
@@ -22,7 +21,7 @@ export default async function ConversationsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const session = await requireAdmin("/admin/conversations");
+  await requireAdmin("/admin/conversations");
   const { filter } = await searchParams;
 
   const filters: Record<string, Prisma.ConversationWhereInput> = {
@@ -30,7 +29,7 @@ export default async function ConversationsPage({
     whatsapp: { channel: "WHATSAPP" },
     web: { channel: "WEB" },
   };
-  const where = { ...scope(session), ...(filters[filter ?? ""] ?? {}) };
+  const where = { ...OWN_OR_GLOBAL, ...(filters[filter ?? ""] ?? {}) };
 
   const { data, error } = await safeQuery(
     async () => {
@@ -48,11 +47,11 @@ export default async function ConversationsPage({
             },
           },
         }),
-        prisma.conversation.count({ where: scope(session) }),
-        prisma.conversation.count({ where: { ...scope(session), handedOff: true } }),
-        prisma.conversation.count({ where: { ...scope(session), channel: "WHATSAPP" } }),
+        prisma.conversation.count({ where: OWN_OR_GLOBAL }),
+        prisma.conversation.count({ where: { ...OWN_OR_GLOBAL, handedOff: true } }),
+        prisma.conversation.count({ where: { ...OWN_OR_GLOBAL, channel: "WHATSAPP" } }),
         prisma.conversation.aggregate({
-          where: { ...scope(session), rating: { not: null } },
+          where: { ...OWN_OR_GLOBAL, rating: { not: null } },
           _avg: { rating: true },
         }),
       ]);
@@ -64,6 +63,7 @@ export default async function ConversationsPage({
   return (
     <>
       <PageHeader
+        eyebrow="Overview"
         title="Live Conversations"
         description="Every conversation the assistant has handled across the web widget and WhatsApp, newest first. Handed-off chats are the ones waiting on a human."
       />
@@ -143,15 +143,6 @@ export default async function ConversationsPage({
             ),
           },
           {
-            header: "Business",
-            cell: (row) =>
-              row.department ? (
-                <DepartmentTag department={row.department} />
-              ) : (
-                <span className="text-xs text-muted-foreground">Not routed</span>
-              ),
-          },
-          {
             header: "Last message",
             cell: (row) => (
               <div className="max-w-md">
@@ -174,11 +165,11 @@ export default async function ConversationsPage({
             header: "Status",
             cell: (row) =>
               row.handedOff ? (
-                <span className="rounded-full bg-amber-500/14 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   Handed off
                 </span>
               ) : row.capture ? (
-                <span className="rounded-full bg-sky-500/12 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-400">
+                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-400">
                   Filling form
                 </span>
               ) : (

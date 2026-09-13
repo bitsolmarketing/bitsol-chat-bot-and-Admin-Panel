@@ -2,16 +2,19 @@
 //  BITSOL AI Assistant — Prisma schema
 //  Designed & Developed by BITSOL MARKETING
 //
-//  One database, two strictly separated businesses:
+//  The system of record for BITSOL Marketing — leads, services, customers,
+//  projects, quotes, conversations, tickets, messaging and administration.
 //
-//    • BITSOL Marketing — leads, services, customers, projects, quotes
-//    • BITSOL Institute of Digital Media & AI — admissions, students, courses,
-//      faculty, batches, attendance, certificates
+//  RETIRED: BITSOL Institute of Digital Media & AI. The product used to serve
+//  this second business too. Its models (the INSTITUTE section below, plus
+//  `InstituteKnowledge`) are kept so the data in them survives: deleting a
+//  model here would make the next `prisma migrate dev` drop its table. No code
+//  reads or writes them any more.
 //
 //  Shared infrastructure (users, RBAC, conversations, tickets, notifications,
-//  settings, logs) carries a `department` column wherever a record belongs to
-//  exactly one business, so every query can be scoped and the two pipelines
-//  never bleed into each other.
+//  settings, logs) still carries a `department` column. The app stamps every
+//  record it writes `MARKETING` and filters every console query to it, which is
+//  what keeps the archived Institute rows out of sight.
 //
 //  Table names are mapped to the snake_case collection names in the brief.
 //  Run `prisma migrate dev` to create the tables.
@@ -34,7 +37,8 @@ datasource db {
 
 // ---------------------------------------------------------------- Enums -----
 
-/// The two businesses the assistant routes between.
+/// Which business a record belongs to. Every new record is MARKETING;
+/// INSTITUTE marks data archived from the retired BITSOL Institute.
 enum Department {
   MARKETING
   INSTITUTE
@@ -102,7 +106,7 @@ enum LeadStage {
   LOST
 }
 
-/// BITSOL Institute admissions pipeline.
+/// RETIRED — BITSOL Institute admissions pipeline, kept for archived records.
 enum AdmissionStage {
   INQUIRY
   CONTACTED
@@ -612,6 +616,9 @@ model Review {
 }
 
 // ================================================================ INSTITUTE ==
+//  RETIRED. Kept only so BITSOL Institute's data is not dropped by a future
+//  migration. Nothing in the application reads or writes these models; remove
+//  them deliberately, with a migration, once the data has been exported.
 
 model Course {
   id            String   @id @default(cuid())
@@ -851,9 +858,8 @@ model Certificate {
 }
 
 // ========================================================= KNOWLEDGE BASES ==
-//  Two physically separate tables. Keeping them apart is what makes the
-//  "never mix business information" rule structural rather than a convention:
-//  a marketing query can only ever read `knowledge_base_marketing`.
+//  `knowledge_base_marketing` is the assistant's knowledge base.
+//  `knowledge_base_institute` is RETIRED — kept for BITSOL Institute's data.
 
 model MarketingKnowledge {
   id          String        @id @default(cuid())

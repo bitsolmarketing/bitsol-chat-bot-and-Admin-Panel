@@ -1,15 +1,13 @@
-import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
-import { safeQuery, sessionDepartment } from "@/lib/admin/queries";
+import { safeQuery } from "@/lib/admin/queries";
 import { DataTable, DbNotice, PageHeader, StatusBadge } from "@/components/admin/ui";
 import { formatDate, formatPkr } from "@/lib/utils";
 
 export const metadata = { title: "Customers" };
 
 export default async function CustomersPage() {
-  const session = await requireAdmin("/admin/crm/customers");
-  if (sessionDepartment(session) === "INSTITUTE") notFound();
+  await requireAdmin("/admin/crm/customers");
 
   const { data, error } = await safeQuery(
     () =>
@@ -30,8 +28,8 @@ export default async function CustomersPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Clients"
         title="Customers"
-        department="MARKETING"
         description="Won leads become customers. Everything they've bought, been quoted and are currently having built sits here."
       />
 
