@@ -1,12 +1,22 @@
-import { User2, Volume2 } from "lucide-react";
+import { CalendarCheck, CheckCircle2, LifeBuoy, User2, Volume2 } from "lucide-react";
 import { LogoMark } from "@/components/branding/Logo";
 import { cn, isUrduScript } from "@/lib/utils";
-import type { ChatMessage } from "@/types";
+import type { CapturedRecord, ChatMessage } from "@/types";
+
+const RECEIPTS: Record<CapturedRecord["kind"], { label: string; icon: typeof CheckCircle2 }> = {
+  LEAD: { label: "Your details are with our team", icon: CheckCircle2 },
+  MEETING: { label: "Consultation requested — the team will confirm the time", icon: CalendarCheck },
+  TICKET: { label: "Support ticket opened", icon: LifeBuoy },
+};
 
 /**
  * Renders a single chat message. Detects Urdu/Punjabi script to switch to RTL,
  * and applies a small, safe text formatter (bold + bullets + headings) so
  * responses read well without pulling in a full markdown renderer.
+ *
+ * Under an assistant reply it also shows a receipt for each CRM record that
+ * turn created, so the customer has a reference without the model having to
+ * know one existed.
  */
 export function MessageBubble({
   message,
@@ -43,24 +53,47 @@ export function MessageBubble({
 
       <div
         className={cn(
-          "group relative max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed md:max-w-[78%]",
-          isUser
-            ? "rounded-tr-md bg-brand text-white shadow-brand"
-            : "rounded-tl-md border border-white/[0.07] bg-white/[0.035] text-white/90"
+          "flex min-w-0 max-w-[85%] flex-col gap-2 md:max-w-[78%]",
+          isUser ? "items-end" : "items-start"
         )}
       >
-        <div className={cn(rtl && "urdu")}>{renderContent(message.content)}</div>
+        <div
+          className={cn(
+            "group relative rounded-2xl px-4 py-3 text-[14px] leading-relaxed",
+            isUser
+              ? "rounded-tr-md bg-brand text-white shadow-brand"
+              : "rounded-tl-md border border-white/[0.07] bg-white/[0.035] text-white/90"
+          )}
+        >
+          <div className={cn(rtl && "urdu")}>{renderContent(message.content)}</div>
 
-        {!isUser && message.content && onSpeak && (
-          <button
-            type="button"
-            onClick={() => onSpeak(message.content)}
-            aria-label="Read this answer aloud"
-            className="absolute -bottom-3 right-2 hidden rounded-full bg-brand-slate p-1.5 text-white/60 shadow ring-1 ring-white/10 transition hover:text-brand-cyan group-hover:block"
-          >
-            <Volume2 className="size-3.5" />
-          </button>
-        )}
+          {!isUser && message.content && onSpeak && (
+            <button
+              type="button"
+              onClick={() => onSpeak(message.content)}
+              aria-label="Read this answer aloud"
+              className="absolute -bottom-3 right-2 hidden rounded-full bg-brand-slate p-1.5 text-white/60 shadow ring-1 ring-white/10 transition hover:text-brand-cyan group-hover:block"
+            >
+              <Volume2 className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {message.records?.map((record) => {
+          const receipt = RECEIPTS[record.kind];
+          return (
+            <p
+              key={record.reference}
+              className="inline-flex max-w-full animate-fade-in-up flex-wrap items-center gap-x-2 gap-y-0.5 rounded-full border border-brand-cyan/20 bg-brand-cyan/[0.06] px-3 py-1.5 text-[12px] text-white/75"
+            >
+              <receipt.icon className="size-3.5 shrink-0 text-brand-cyan" aria-hidden />
+              <span>{receipt.label}</span>
+              <span className="font-mono text-[11px] tracking-wide text-brand-cyan">
+                {record.reference}
+              </span>
+            </p>
+          );
+        })}
       </div>
     </div>
   );

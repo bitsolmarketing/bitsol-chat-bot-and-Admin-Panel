@@ -21,11 +21,11 @@ export function createOpenAIProvider(isOllama = false): AIProvider {
 
   return {
     name: isOllama ? "ollama" : "openai",
-    async *streamChat({ system, messages }) {
+    async *streamChat({ system, messages, model, maxTokens }) {
       const body = {
-        model: config.ai.model,
+        model: model ?? config.ai.model,
         stream: true,
-        max_tokens: config.ai.maxTokens,
+        max_tokens: maxTokens ?? config.ai.maxTokens,
         messages: [
           { role: "system", content: system },
           ...messages.map((m: ChatTurn) => ({ role: m.role, content: m.content })),

@@ -13,6 +13,8 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   createdAt?: string;
+  /** CRM records this reply's turn created, shown as receipts under the bubble. */
+  records?: CapturedRecord[];
 }
 
 /** A tappable quick-reply / suggestion surfaced to the user. */
@@ -23,16 +25,12 @@ export interface QuickReply {
 }
 
 /**
- * A structured workflow the assistant can hand off to the UI — e.g. once the
- * user says "I want a quote", the model finishes its sentence and the client
- * opens the matching form instead of collecting nine fields conversationally.
+ * A CRM record created from what the customer said in conversation — a lead,
+ * a consultation request or a support ticket.
  */
-export type ChatActionKind = "LEAD_FORM" | "MEETING_FORM" | "QUOTE_FORM" | "SUPPORT_FORM";
-
-export interface ChatAction {
-  kind: ChatActionKind;
-  /** Pre-selected service slug, when the user named one. */
-  subject?: string;
+export interface CapturedRecord {
+  kind: "LEAD" | "MEETING" | "TICKET";
+  reference: string;
 }
 
 /** SSE event payloads streamed from /api/chat to the browser. */
@@ -42,9 +40,11 @@ export type ChatStreamEvent =
   | {
       type: "done";
       ticketId?: string;
+      /** Quick replies; an empty list means the reply is waiting on an answer. */
       suggestions?: string[];
-      action?: ChatAction;
     }
+  /** Sent after `done`, once the customer's details have reached the CRM. */
+  | { type: "capture"; records: CapturedRecord[] }
   | { type: "error"; message: string };
 
 // -------------------------------------------------------- Knowledge base ----
@@ -101,8 +101,6 @@ export interface MenuEntry {
   labelUr: string;
   /** Prompt sent to the assistant when tapped. */
   prompt: string;
-  /** Optional structured workflow to open instead of sending a prompt. */
-  action?: ChatAction;
   children?: MenuEntry[];
 }
 

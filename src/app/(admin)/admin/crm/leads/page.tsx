@@ -158,14 +158,19 @@ export default async function LeadsPage({
                 {row.company && (
                   <p className="text-xs text-muted-foreground">{row.company}</p>
                 )}
-                <a
-                  href={`https://wa.me/${row.phone.replace(/\D/g, "")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-muted-foreground hover:text-primary hover:underline"
-                >
-                  {row.phone}
-                </a>
+                {/* A customer may give the assistant only an email address. */}
+                {row.phone ? (
+                  <a
+                    href={`https://wa.me/${row.phone.replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                  >
+                    {row.phone}
+                  </a>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{row.email ?? "—"}</p>
+                )}
               </div>
             ),
           },

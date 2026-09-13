@@ -4,10 +4,10 @@ import { MARKETING_SERVICES } from "./services";
 /**
  * BITSOL Marketing conversation menu.
  *
- * Rendered in the chat menu panel and used as the model's map of what it can
- * do. Leaf entries either send a prompt (the model answers from the knowledge
- * base) or open a structured workflow (`action`) so multi-field capture happens
- * in a form rather than across nine conversational turns.
+ * Rendered in the chat menu panel. Every leaf sends a prompt: questions are
+ * answered from the knowledge base, and requests (a quote, a consultation,
+ * support) start a conversation in which the representative asks for what the
+ * team needs.
  */
 export const MARKETING_MENU: MenuEntry[] = [
   {
@@ -44,22 +44,19 @@ export const MARKETING_MENU: MenuEntry[] = [
     id: "mk-quote",
     label: "Request Quote",
     labelUr: "قیمت معلوم کریں",
-    prompt: "I'd like to request a quote.",
-    action: { kind: "QUOTE_FORM" },
+    prompt: "I'd like a quote for a project.",
   },
   {
     id: "mk-consultation",
     label: "Book Consultation",
     labelUr: "مشاورت بُک کریں",
     prompt: "I'd like to book a free consultation.",
-    action: { kind: "MEETING_FORM" },
   },
   {
     id: "mk-support",
     label: "Support",
     labelUr: "سپورٹ",
-    prompt: "I need support with an existing project.",
-    action: { kind: "SUPPORT_FORM" },
+    prompt: "I'm an existing client and need help with my project.",
   },
   {
     id: "mk-contact",

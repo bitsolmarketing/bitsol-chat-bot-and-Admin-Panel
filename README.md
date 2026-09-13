@@ -3,9 +3,11 @@
 The AI concierge and admin console for **BITSOL Marketing** — business services,
 digital solutions, AI automation and software development.
 
-On the website and on WhatsApp, the assistant answers from BITSOL Marketing's own
-knowledge base, captures leads, books consultations and raises support tickets —
-each with a real reference number — in English, Urdu, Roman Urdu or Punjabi.
+On the website and on WhatsApp, the assistant talks like one of BITSOL
+Marketing's customer service representatives: it answers from the company's own
+knowledge base and, along the way, asks for the details the team needs — then
+turns them into leads, consultation requests and support tickets, each with a
+real reference number. In English, Urdu, Roman Urdu or Punjabi.
 
 > **Powered by Artificial Intelligence**
 > **Designed & Developed by [BITSOL MARKETING](https://bitsolmarketing.com)** —
@@ -22,12 +24,14 @@ each with a real reference number — in English, Urdu, Roman Urdu or Punjabi.
   consultations and support on desktop, a slide-over menu on mobile
 - 🌐 **English · Urdu · Roman Urdu · Punjabi**, with RTL rendering and tolerance
   for spelling mistakes, abbreviations and mixed-language input
-- 📝 In-chat workflow forms — quote request, consultation booking, support
-  ticket — each issuing a real reference number
+- 🙋 **No forms.** The representative asks for a name, a number, the business
+  and the budget in conversation, one question at a time and in no fixed order;
+  a receipt with the reference number appears once the team has the request
 - 🎙️ Voice input & voice responses, image/PDF attachment, human handoff with ticketing
-- 🟢 **The same assistant on WhatsApp** — Meta Cloud API webhook, tappable menus
-  and lists, one-question-at-a-time lead capture, human handoff. Same knowledge
-  base, same reference numbers. See [WhatsApp chatbot](#-whatsapp-chatbot).
+- 🟢 **The same assistant on WhatsApp** — Meta Cloud API webhook, quick-action
+  buttons, the same conversational capture (it never asks for the number the
+  customer is writing from), human handoff. Same knowledge base, same reference
+  numbers. See [WhatsApp chatbot](#-whatsapp-chatbot).
 
 **Business logic**
 - 🏢 12 services, each with overview · benefits · features · process ·
@@ -148,6 +152,10 @@ Set `AI_PROVIDER` in `.env`:
 `AI_MODEL` defaults to `claude-opus-4-8`. Set `AI_THINKING=true` for Claude
 adaptive thinking (deeper, slower).
 
+Every turn also makes a short, JSON-only call that reads the conversation for the
+customer's details. It uses `AI_MODEL` unless `AI_EXTRACTION_MODEL` names a
+cheaper model from the same provider (for Claude, `claude-haiku-4-5` is plenty).
+
 Without a key the UI still runs — sending a message shows a graceful error.
 
 ---
@@ -157,22 +165,38 @@ Without a key the UI still runs — sending a message shows a graceful error.
 ```
 User message
    │
+   ├─ load the conversation's capture → what the customer has already told us
    ├─ detectLanguage()        → EN / UR / Roman UR / PA
    ├─ retrieveKnowledge()     → the best-matching knowledge-base entries
-   ├─ buildSystemPrompt()     → identity, scope, services, contacts, entries
+   ├─ buildSystemPrompt()     → identity, scope, services, contacts, entries,
+   │                            known details and what the team still needs
    │
-   ├─ stream the model's answer to the browser (SSE)
+   ├─ stream the representative's reply (SSE)    ┐ in parallel
+   ├─ extractCustomerDetails() → JSON details     ┘
    │
    ├─ shouldEscalate()?       → ticket + team notification
-   ├─ detectAction()?         → open the quote / consultation / support form
-   └─ suggestFollowUps()      → quick-reply chips
+   ├─ suggestFollowUps()      → quick-reply chips (none when the reply asks a question)
+   └─ syncCapture()           → lead / consultation request / ticket + receipt
 ```
 
-The model writes the prose; `src/lib/ai/intents.ts` decides what the product
-*does*, so behaviour stays predictable and testable. The system prompt keeps the
-assistant to BITSOL Marketing's scope — asked about individual courses or
-admissions, it says those aren't offered and points to Corporate Training for
-teams instead of inventing an answer.
+**Why conversation instead of forms.** A form asks everyone the same eight
+questions up front; a representative asks the one that fits the moment and
+skips what it already knows. The prompt tells the model which details the team
+still needs and the rules for asking — help first, one question per message, no
+fixed order, never twice, no pressure.
+
+**Why the details are extracted, not trusted to the reply.** The model writes the
+prose; a separate JSON-only call reads the details back out, and
+[`src/lib/ai/customer.ts`](src/lib/ai/customer.ts) validates them — a phone number
+or email must appear in something the customer typed, BITSOL's own contact
+details are refused, services must exist and meeting dates must be real future
+days. [`src/lib/capture.ts`](src/lib/capture.ts) then creates each record once,
+under a row lock, and afterwards writes back only what the customer changed, so
+an edit made in the console survives the next message.
+
+The system prompt keeps the assistant to BITSOL Marketing's scope — asked about
+individual courses or admissions, it says those aren't offered and points to
+Corporate Training for teams instead of inventing an answer.
 
 ---
 
@@ -192,22 +216,19 @@ POST /webhook               ── X-Hub-Signature-256 verified, else 401
    ├─ Contact upserted, thread resolved (24h window → same conversation)
    │
    ├─ "menu" / "hi"?            → welcome message + quick actions
-   ├─ Mid-capture?              → next form question   (capture.ts)
-   ├─ Tapped "Get a quote"?     → start capture
    ├─ Asked for a human?        → ticket + team notification
-   ├─ Quote / meeting intent?   → start capture
-   └─ Otherwise                 → AI answer + quick-action buttons
+   └─ Otherwise (incl. "Get a quote") → the representative replies,
+                                  details are extracted and synced
    │
    ▼
-Lead written with source = WHATSAPP → visible in /admin/crm/leads
+Lead / meeting / ticket with source = WHATSAPP → visible in the console,
+receipt with the reference sent to the customer
 ```
 
-**Why the capture is a state machine, not a prompt.** WhatsApp has no forms, so
-the eight fields the CRM needs are asked one message at a time and the progress
-is stored in `conversations.capture`. Every webhook delivery is a cold start, so
-the step index has to live in the database. Most steps are tappable buttons or
-lists — nobody types a budget range correctly in four languages. See
-[`src/lib/whatsapp/capture.ts`](src/lib/whatsapp/capture.ts).
+Every webhook delivery is a cold start, so what the customer has told us lives in
+`conversations.capture` rather than in memory. The WhatsApp number and profile
+name are passed to the representative as already known, so it never asks for a
+number it has.
 
 ### Connecting a number
 
@@ -275,7 +296,7 @@ console, the bot just stops replying.
 │   │       ├── catalog/ search/ health/ auth/
 │   │       └── admin/             # record updates, CRM activities
 │   ├── components/
-│   │   ├── chat/                  # ChatWindow, MenuPanel, WorkflowForm
+│   │   ├── chat/                  # ChatWindow, MenuPanel, MessageBubble
 │   │   ├── admin/                 # AdminShell, nav, tables, status controls
 │   │   ├── branding/              # Logo, SiteHeader, Footer, attribution
 │   │   ├── splash/ ui/
@@ -284,8 +305,9 @@ console, the bot just stops replying.
 │   ├── lib/
 │   │   ├── brands.ts              # the BITSOL Marketing profile
 │   │   ├── i18n.ts                # EN / UR / Roman UR / PA
-│   │   ├── ai/                    # retrieval · prompt · intents · providers
-│   │   ├── whatsapp/              # Cloud API client · parser · capture · handler
+│   │   ├── ai/                    # retrieval · prompt · intents · customer details · providers
+│   │   ├── capture.ts             # conversation details → leads, meetings, tickets
+│   │   ├── whatsapp/              # Cloud API client · parser · handler
 │   │   ├── admin/queries.ts       # failure-tolerant data access, Institute filter
 │   │   └── auth.ts db.ts redis.ts config.ts notify.ts api.ts session.ts
 │   ├── middleware.ts              # admin console guard

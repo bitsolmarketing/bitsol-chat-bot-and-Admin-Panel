@@ -33,6 +33,8 @@ Set production values in `.env`:
   rate limiting fails open and allows every request
 - `JWT_SECRET` = `openssl rand -base64 48`
 - `AI_PROVIDER` + the matching API key and `AI_MODEL`
+- `AI_EXTRACTION_MODEL` (optional) — a cheaper model from the same provider for
+  the per-turn call that reads the customer's details; defaults to `AI_MODEL`
 - `SALES_NOTIFY_EMAIL` — where new leads, meetings, tickets and handoffs are
   announced
 - `SEED_ADMIN_PASSWORD` / `SEED_STAFF_PASSWORD` — **change these before seeding**

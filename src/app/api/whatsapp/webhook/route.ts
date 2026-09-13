@@ -114,8 +114,8 @@ export async function POST(req: NextRequest) {
     if (autoReplyEnabled()) {
       const messages = parseInbound(body);
       // Sequential on purpose: two messages from the same person share a
-      // conversation row, and answering them in parallel would interleave the
-      // capture state machine's reads and writes.
+      // conversation, and answering them in parallel would send the replies
+      // out of order.
       for (const message of messages) {
         await handleInbound(message);
       }

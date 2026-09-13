@@ -8,35 +8,27 @@ import { generateReference, shortId } from "@/lib/utils";
 import { detectLanguage, type Language } from "@/lib/i18n";
 import { BRAND, DEPARTMENT } from "@/lib/brands";
 import {
-  detectAction,
+  asksQuestion,
+  extractCustomerDetails,
   planAssistantTurn,
   shouldEscalate,
   streamAssistantReply,
   type ChatTurn,
+  type CustomerDetails,
 } from "@/lib/ai";
-import { findService } from "@/data/marketing/services";
-import { markAsRead, sendButtons, sendList, sendText, toDisplayPhone } from "./client";
-import {
-  advanceCapture,
-  asCaptureState,
-  beginCapture,
-  isCaptureStale,
-  seedFromWaId,
-  type CapturePrompt,
-  type CaptureState,
-} from "./capture";
+import { readCapture, recordsOf, syncCapture, type CaptureState } from "@/lib/capture";
+import { markAsRead, sendButtons, sendText, toDisplayPhone } from "./client";
 import {
   ACTION_BUTTON_PREFIX,
   busyNotice,
-  captureCancelled,
-  captureConfirmation,
   escalationNotice,
   mediaAcknowledgement,
   optOutConfirmation,
   quickActions,
+  recordReceipt,
   welcomeMessage,
 } from "./copy";
-import type { InboundMessage } from "./types";
+import type { InboundMessage, ReplyButton } from "./types";
 
 /**
  * =============================================================================
@@ -52,10 +44,14 @@ import type { InboundMessage } from "./types";
  *
  *    • **No streaming.** WhatsApp takes one finished message, so the stream is
  *      accumulated and sent as one (or several, past 4096 characters).
- *    • **No forms.** Structured capture happens through `capture.ts`, one
- *      question per message, resumed from the database on every delivery.
  *    • **No session.** A phone number is the identity, and the same thread can
  *      span months — so the conversation is resolved from the number.
+ *
+ *  Details are gathered exactly as on the web: the representative asks for them
+ *  in conversation, `extractCustomerDetails` reads them back out, and
+ *  `lib/capture.ts` turns them into leads, consultation requests and tickets.
+ *  The number the customer is writing from is already known, so it is never
+ *  asked for.
  *
  *  Every path is defensive: this runs inside a webhook Meta will retry on any
  *  non-200, so a failure here must be logged and swallowed, never thrown.
@@ -168,39 +164,21 @@ async function route(message: InboundMessage): Promise<void> {
     answer.startsWith(LEGACY_DEPARTMENT_BUTTON_PREFIX) ||
     MENU_WORDS.includes(lowered)
   ) {
-    await clearCapture(conversation.id);
     return sendMenu(context);
   }
 
-  // --- An in-progress capture owns the turn ---------------------------------
-  const active = asCaptureState(conversation.capture);
-  if (active && !isCaptureStale(active)) {
-    return continueCapture(context, active, answer);
-  }
-  if (active) await clearCapture(conversation.id);
-
-  // --- Explicit "start the form" tap ----------------------------------------
-  if (answer === `${ACTION_BUTTON_PREFIX}capture`) {
-    return startCapture(context);
-  }
+  const capture = readCapture(conversation.capture);
 
   // --- Human handoff --------------------------------------------------------
   if (answer === `${ACTION_BUTTON_PREFIX}human` || shouldEscalate(message.text)) {
-    return escalate(context, message.text);
+    return escalate(context, message.text, capture.details);
   }
 
-  // --- Intent that deserves a structured capture ----------------------------
-  const action = detectAction(message.text);
-  if (action?.kind === "QUOTE_FORM" || action?.kind === "MEETING_FORM") {
-    return startCapture(context, action.subject);
-  }
-  if (action?.kind === "SUPPORT_FORM") {
-    return escalate(context, message.text);
-  }
-
-  // --- Ordinary question: answer it with the same brain as the web chat -----
+  // --- Everything else is a conversation with the representative ------------
+  // "Get a quote" included: the button's title arrives as the customer's
+  // message, and the representative asks for what the team needs from there.
   const history = await loadHistory(conversation.id);
-  await answerWithAssistant(context, history, planAssistantTurn(history));
+  await converse(context, history, capture);
 }
 
 // ------------------------------------------------------------------ Context --
@@ -355,13 +333,11 @@ function resolveLanguage(message: InboundMessage, stored: PrismaLanguage): Langu
 async function say(
   context: Context,
   text: string,
-  options?: { buttons?: CapturePrompt["buttons"]; list?: CapturePrompt["list"]; footer?: string }
+  options?: { buttons?: ReplyButton[]; footer?: string }
 ): Promise<void> {
-  const result = options?.list
-    ? await sendList(context.waId, text, options.list.label, options.list.rows)
-    : options?.buttons?.length
-      ? await sendButtons(context.waId, text, options.buttons, options.footer)
-      : await sendText(context.waId, text);
+  const result = options?.buttons?.length
+    ? await sendButtons(context.waId, text, options.buttons, options.footer)
+    : await sendText(context.waId, text);
 
   await prisma.message
     .create({
@@ -403,7 +379,7 @@ async function say(
     message: result.error ?? "Unknown error sending to the WhatsApp Cloud API.",
     metadata: {
       to: context.phone,
-      shape: options?.list ? "list" : options?.buttons?.length ? "buttons" : "text",
+      shape: options?.buttons?.length ? "buttons" : "text",
     },
   });
 }
@@ -413,198 +389,66 @@ async function sendMenu(context: Context): Promise<void> {
   await say(context, welcome.text, { buttons: welcome.buttons, footer: welcome.footer });
 }
 
-/** Generate an answer with the shared assistant brain and send it. */
-async function answerWithAssistant(
+/**
+ * One turn with the representative: answer, then turn whatever the customer
+ * has told us into CRM records.
+ */
+async function converse(
   context: Context,
   history: ChatTurn[],
-  plan: ReturnType<typeof planAssistantTurn>
+  capture: CaptureState
 ): Promise<void> {
+  const plan = planAssistantTurn(history, {
+    channel: "WHATSAPP",
+    details: capture.details,
+    whatsapp: { number: context.phone, profileName: context.profileName },
+    records: recordsOf(capture),
+  });
+
+  // Read the customer's details alongside the reply rather than after it.
+  const extraction = extractCustomerDetails(history, capture.details, {
+    channelPhone: context.phone,
+  });
+
   let text = "";
   try {
     for await (const chunk of streamAssistantReply(history, plan)) text += chunk;
   } catch (error) {
     console.error("[whatsapp] model error:", error);
-    await say(context, busyNotice(context.language));
-    return;
+    text = "";
   }
 
   if (!text.trim()) {
     await say(context, busyNotice(context.language));
-    return;
-  }
-
-  // The chips under an answer are what turn a question into a lead — without
-  // them the visitor has to know to type "I want a quote".
-  await say(context, text, { buttons: quickActions(context.language) });
-}
-
-// ---------------------------------------------------------------- Capture ---
-
-async function startCapture(context: Context, subject?: string): Promise<void> {
-  // Pre-fill what we already know: the service they asked about. Every
-  // pre-filled field is a question skipped.
-  const seed: Record<string, string> = {};
-  const service = subject ? findService(subject) : undefined;
-  if (service) {
-    seed.serviceGroup = service.group;
-    seed.service = service.slug;
-  }
-
-  const outcome = beginCapture("LEAD", context.language, seed);
-  if (outcome.status !== "ask") return;
-
-  await saveCapture(context.conversationId, outcome.state);
-  await say(context, outcome.prompt.text, {
-    buttons: outcome.prompt.buttons,
-    list: outcome.prompt.list,
-  });
-}
-
-async function continueCapture(
-  context: Context,
-  state: CaptureState,
-  answer: string
-): Promise<void> {
-  const outcome = advanceCapture(state, answer, context.language, seedFromWaId(context.waId));
-
-  if (outcome.status === "cancelled") {
-    await clearCapture(context.conversationId);
-    await say(context, captureCancelled(context.language));
-    return;
-  }
-
-  if (outcome.status === "ask") {
-    await saveCapture(context.conversationId, outcome.state);
-    await say(context, outcome.prompt.text, {
-      buttons: outcome.prompt.buttons,
-      list: outcome.prompt.list,
+  } else {
+    // The chips under an answer are what turn a question into a lead — but not
+    // under a question, where they would pull the customer away from answering.
+    await say(context, text, {
+      buttons: asksQuestion(text) ? undefined : quickActions(context.language),
     });
-    return;
   }
 
-  await clearCapture(context.conversationId);
-  await completeCapture(context, outcome.answers);
-}
-
-async function saveCapture(conversationId: string, state: CaptureState): Promise<void> {
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { capture: state as unknown as Prisma.InputJsonValue },
-  });
-}
-
-async function clearCapture(conversationId: string): Promise<void> {
-  await prisma.conversation
-    .update({ where: { id: conversationId }, data: { capture: Prisma.DbNull } })
-    .catch(() => {});
-}
-
-/** Write the finished capture into the CRM and confirm it to the customer. */
-async function completeCapture(
-  context: Context,
-  answers: Record<string, string>
-): Promise<void> {
-  const created = await createLead(context, answers);
-
-  if (!created) {
-    await say(context, busyNotice(context.language));
-    return;
-  }
-
-  await say(
-    context,
-    captureConfirmation(context.language, {
-      name: created.name,
-      reference: created.reference,
-      phone: created.phone,
-    }),
-    { buttons: quickActions(context.language) }
+  const captured = await syncCapture(
+    {
+      conversationId: context.conversationId,
+      source: "WHATSAPP",
+      fallback: { name: context.profileName, phone: context.phone },
+    },
+    await extraction
   );
-}
 
-interface CreatedRecord {
-  id: string;
-  reference: string;
-  name: string;
-  phone: string;
-}
-
-async function createLead(
-  context: Context,
-  answers: Record<string, string>
-): Promise<CreatedRecord | null> {
-  const reference = generateReference("LEAD");
-  const service = answers.service ? findService(answers.service) : undefined;
-  const name = answers.name || context.profileName || context.phone;
-  const phone = answers.phone || context.phone;
-
-  // "Something else" is a real answer, not a missing one — keep it where the
-  // sales team will read it rather than dropping it on the floor.
-  const requirements = [
-    answers.requirements,
-    !service && answers.serviceGroup
-      ? `\n\nArea of interest: ${answers.serviceGroup === "other" ? "Not in the standard catalogue" : answers.serviceGroup}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join("");
-
-  try {
-    const lead = await prisma.marketingLead.create({
-      data: {
-        reference,
-        name,
-        company: answers.company || null,
-        phone,
-        serviceSlug: service?.slug ?? null,
-        budget: answers.budget || null,
-        timeline: answers.timeline || null,
-        requirements: requirements || "Captured on WhatsApp.",
-        source: "WHATSAPP",
-        stage: "NEW",
-        conversationId: context.conversationId,
-      },
-      select: { id: true },
-    });
-
-    await notifyTeam({
-      subject: `New WhatsApp lead ${reference} — ${name}${answers.company ? ` (${answers.company})` : ""}`,
-      body: [
-        `Reference: ${reference}`,
-        `Source: WhatsApp (${context.phone})`,
-        `Name: ${name}`,
-        answers.company ? `Company: ${answers.company}` : null,
-        `Phone: ${phone}`,
-        service ? `Service: ${service.name}` : `Area: ${answers.serviceGroup ?? "Unspecified"}`,
-        answers.budget ? `Budget: ${answers.budget}` : null,
-        answers.timeline ? `Timeline: ${answers.timeline}` : null,
-        "",
-        "Requirements:",
-        answers.requirements || "—",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      link: `/admin/crm/leads/${lead.id}`,
-    });
-
-    await logEvent({
-      action: "lead.created",
-      entity: "MarketingLead",
-      entityId: lead.id,
-      message: `Lead ${reference} captured on WhatsApp from ${context.phone}.`,
-      metadata: { reference, channel: "WHATSAPP", service: service?.slug },
-    });
-
-    return { id: lead.id, reference, name, phone };
-  } catch (error) {
-    console.error("[whatsapp] lead create failed:", error);
-    return null;
+  if (captured?.created.length) {
+    await say(context, recordReceipt(context.language, captured.created));
   }
 }
 
 // -------------------------------------------------------------- Escalation --
 
-async function escalate(context: Context, request: string): Promise<void> {
+async function escalate(
+  context: Context,
+  request: string,
+  details: CustomerDetails
+): Promise<void> {
   const reference = generateReference("TKT");
 
   try {
@@ -616,8 +460,9 @@ async function escalate(context: Context, request: string): Promise<void> {
         status: "OPEN",
         subject: "Human requested on WhatsApp",
         description: request || "The customer asked to speak to a person.",
-        contactName: context.profileName ?? null,
-        contactPhone: context.phone,
+        contactName: details.name ?? context.profileName ?? null,
+        contactPhone: details.phone ?? context.phone,
+        contactEmail: details.email ?? null,
         conversationId: context.conversationId,
       },
     });
@@ -628,13 +473,13 @@ async function escalate(context: Context, request: string): Promise<void> {
     });
 
     await notifyTeam({
-      subject: `WhatsApp handoff ${reference} — ${context.profileName ?? context.phone}`,
+      subject: `WhatsApp handoff ${reference} — ${details.name ?? context.profileName ?? context.phone}`,
       body: [
         `A WhatsApp customer asked for a human.`,
         ``,
         `Ticket: ${reference}`,
         `WhatsApp: ${context.phone}`,
-        context.profileName ? `Name: ${context.profileName}` : null,
+        details.name || context.profileName ? `Name: ${details.name ?? context.profileName}` : null,
         ``,
         `Their message:`,
         request || "—",

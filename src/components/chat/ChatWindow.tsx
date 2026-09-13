@@ -16,7 +16,6 @@ import { MessageBubble } from "./MessageBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { SuggestedQuestions } from "./SuggestedQuestions";
 import { MenuPanel } from "./MenuPanel";
-import { WorkflowForm } from "./WorkflowForm";
 import { ChatInput } from "./ChatInput";
 import { LogoMark } from "@/components/branding/Logo";
 import { Button } from "@/components/ui/button";
@@ -25,7 +24,7 @@ import { MARKETING_QUICK_REPLIES } from "@/data/marketing/menu";
 import { MARKETING_SERVICES } from "@/data/marketing/services";
 import { detectLanguage, speechTagFor, t, type Language } from "@/lib/i18n";
 import { cn, generateConversationReference, shortId } from "@/lib/utils";
-import type { ChatAction, ChatMessage, ChatStreamEvent } from "@/types";
+import type { ChatMessage, ChatStreamEvent } from "@/types";
 
 /**
  * Bumped from v1 when BITSOL Institute was retired, so a returning visitor's
@@ -38,11 +37,15 @@ interface PersistedState {
   messages: ChatMessage[];
 }
 
-/** Workflows offered in the desktop rail — the three things people come to do. */
-const RAIL_ACTIONS: Array<{ label: string; icon: typeof FileText; action: ChatAction }> = [
-  { label: "Request a quote", icon: FileText, action: { kind: "QUOTE_FORM" } },
-  { label: "Book a consultation", icon: CalendarCheck, action: { kind: "MEETING_FORM" } },
-  { label: "Raise a support ticket", icon: LifeBuoy, action: { kind: "SUPPORT_FORM" } },
+/**
+ * The three things people come to do, offered in the desktop rail. Each opens
+ * the conversation with the representative rather than a form — it asks for
+ * whatever it needs from there.
+ */
+const RAIL_ACTIONS: Array<{ label: string; icon: typeof FileText; prompt: string }> = [
+  { label: "Request a quote", icon: FileText, prompt: "I'd like a quote for a project." },
+  { label: "Book a consultation", icon: CalendarCheck, prompt: "I'd like to book a free consultation." },
+  { label: "Get support", icon: LifeBuoy, prompt: "I'm an existing client and need help with my project." },
 ];
 
 /**
@@ -50,13 +53,13 @@ const RAIL_ACTIONS: Array<{ label: string; icon: typeof FileText; action: ChatAc
  *  BITSOL AI Assistant — chat surface
  * =============================================================================
  *
- *  Owns the transcript, the streaming request and the workflow form currently
- *  open. The transcript is persisted with its conversation reference, which is
- *  what gives the conversation memory across reloads.
+ *  Owns the transcript and the streaming request. The transcript is persisted
+ *  with its conversation reference, which is what gives the conversation
+ *  memory across reloads — and what the server keys the customer's details to.
  *
- *  On wide screens a rail sits beside the transcript with the workflows and the
- *  full service list, so a visitor can act without knowing what to type; on a
- *  phone the same content lives behind the Menu button.
+ *  On wide screens a rail sits beside the transcript with the common requests
+ *  and the full service list, so a visitor can start without knowing what to
+ *  type; on a phone the same content lives behind the Menu button.
  * =============================================================================
  */
 export function ChatWindow() {
@@ -65,14 +68,13 @@ export function ChatWindow() {
   const [streaming, setStreaming] = useState(false);
   const [voiceOut, setVoiceOut] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
-  const [activeForm, setActiveForm] = useState<ChatAction | null>(null);
+  /** `null` shows the default chips; an empty list hides them. */
+  const [quickReplies, setQuickReplies] = useState<string[] | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   const conversationRef = useRef<string>("");
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
 
   // ---------------------------------------------------------------- restore --
   useEffect(() => {
@@ -102,20 +104,15 @@ export function ChatWindow() {
     }
   }, [messages, hydrated]);
 
-  // Keep the newest content in view. An opened form is brought in by its top
-  // edge — scrolling to the bottom would hide its title on a short screen —
-  // and the welcome screen is left alone so its headline stays visible.
+  // Keep the newest content in view. The welcome screen is left alone so its
+  // headline stays visible on a short screen.
   useEffect(() => {
-    if (activeForm && formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
     if (!messages.length) return;
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages, streaming, activeForm]);
+  }, [messages, streaming]);
 
   const speak = useCallback((text: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -130,8 +127,6 @@ export function ChatWindow() {
     async (text: string) => {
       if (streaming || !text.trim()) return;
 
-      setActiveForm(null);
-      setQuickReplies([]);
       setLanguage(detectLanguage(text));
 
       const userMsg: ChatMessage = { id: shortId(12), role: "user", content: text };
@@ -143,6 +138,15 @@ export function ChatWindow() {
 
       const controller = new AbortController();
       abortRef.current = controller;
+
+      // The reply is finished at `done`, but the stream stays open a moment
+      // longer to report CRM records — the composer must not wait for that.
+      // Guarded so a late close cannot end a newer message's streaming state.
+      const finish = () => {
+        if (abortRef.current !== controller) return;
+        abortRef.current = null;
+        setStreaming(false);
+      };
 
       try {
         const res = await fetch("/api/chat", {
@@ -194,18 +198,26 @@ export function ChatWindow() {
                 prev.map((m) => (m.id === assistantId ? { ...m, content: full } : m))
               );
             } else if (event.type === "done") {
-              if (event.suggestions?.length) setQuickReplies(event.suggestions);
-              if (event.action) setActiveForm(event.action);
+              setQuickReplies(event.suggestions ?? null);
+              if (voiceOut && full) speak(full);
+              finish();
+            } else if (event.type === "capture") {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, records: [...(m.records ?? []), ...event.records] }
+                    : m
+                )
+              );
             } else if (event.type === "error") {
               full = event.message;
               setMessages((prev) =>
                 prev.map((m) => (m.id === assistantId ? { ...m, content: full } : m))
               );
+              finish();
             }
           }
         }
-
-        if (voiceOut && full) speak(full);
       } catch (err: unknown) {
         if ((err as { name?: string })?.name !== "AbortError") {
           setMessages((prev) =>
@@ -222,8 +234,7 @@ export function ChatWindow() {
           );
         }
       } finally {
-        setStreaming(false);
-        abortRef.current = null;
+        finish();
       }
     },
     [messages, streaming, voiceOut, speak]
@@ -240,8 +251,7 @@ export function ChatWindow() {
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     conversationRef.current = generateConversationReference();
     setMessages([]);
-    setQuickReplies([]);
-    setActiveForm(null);
+    setQuickReplies(null);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -249,15 +259,9 @@ export function ChatWindow() {
     }
   }
 
-  /** Append a system-authored confirmation (form submitted, etc.). */
-  function appendAssistant(content: string) {
-    setMessages((prev) => [...prev, { id: shortId(12), role: "assistant", content }]);
-    setActiveForm(null);
-  }
-
   // --------------------------------------------------------------- rendering -
   const isEmpty = messages.length === 0;
-  const chips = quickReplies.length ? quickReplies : MARKETING_QUICK_REPLIES;
+  const chips = quickReplies ?? MARKETING_QUICK_REPLIES;
   const lastMessage = messages[messages.length - 1];
   const awaitingFirstToken =
     streaming && lastMessage?.role === "assistant" && !lastMessage.content;
@@ -268,7 +272,6 @@ export function ChatWindow() {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onPrompt={(prompt) => void send(prompt)}
-        onAction={(action) => setActiveForm(action)}
       />
 
       {/* Desktop rail */}
@@ -283,7 +286,7 @@ export function ChatWindow() {
                 key={item.label}
                 type="button"
                 disabled={streaming}
-                onClick={() => setActiveForm(item.action)}
+                onClick={() => void send(item.prompt)}
                 className="group flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-3 py-2.5 text-left text-[13px] font-medium text-white/85 transition hover:border-brand-cyan/40 hover:bg-brand-cyan/[0.06] hover:text-white disabled:opacity-50"
               >
                 <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand text-white shadow-brand">
@@ -392,7 +395,7 @@ export function ChatWindow() {
 
         {/* Transcript */}
         <div ref={scrollRef} className="scroll-slim flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-          {isEmpty && !activeForm ? (
+          {isEmpty ? (
             <div className="flex min-h-full flex-col items-center justify-center gap-9 py-6">
               <div className="flex flex-col items-center text-center">
                 <span className="relative mb-6 grid size-16 place-items-center">
@@ -420,17 +423,6 @@ export function ChatWindow() {
                 ) : (
                   <MessageBubble key={message.id} message={message} onSpeak={speak} />
                 )
-              )}
-
-              {activeForm && (
-                <div ref={formRef} className="scroll-mt-4 sm:ml-11">
-                  <WorkflowForm
-                    action={activeForm}
-                    conversationRef={conversationRef.current}
-                    onCancel={() => setActiveForm(null)}
-                    onResult={appendAssistant}
-                  />
-                </div>
               )}
             </div>
           )}

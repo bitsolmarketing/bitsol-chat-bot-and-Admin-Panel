@@ -39,7 +39,7 @@ export default async function ConversationsPage({
           orderBy: { updatedAt: "desc" },
           take: 60,
           include: {
-            _count: { select: { messages: true } },
+            _count: { select: { messages: true, leads: true } },
             messages: {
               orderBy: { createdAt: "desc" },
               take: 1,
@@ -168,9 +168,9 @@ export default async function ConversationsPage({
                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   Handed off
                 </span>
-              ) : row.capture ? (
-                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-400">
-                  Filling form
+              ) : row._count.leads > 0 ? (
+                <span className="whitespace-nowrap rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                  Lead captured
                 </span>
               ) : (
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px]">

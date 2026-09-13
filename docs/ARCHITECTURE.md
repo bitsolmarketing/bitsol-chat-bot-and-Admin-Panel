@@ -19,19 +19,23 @@ digital solutions, AI automation and software development.
                         │  planAssistantTurn()         │
                         │   1. detectLanguage()        │  ← EN / UR / Roman UR / PA
                         │   2. retrieveKnowledge()     │  ← best-matching KB entries
-                        │   3. buildSystemPrompt()     │  ← identity, scope, entries
+                        │   3. buildSystemPrompt()     │  ← identity, scope, entries,
+                        │                              │    what the customer told us
                         └───────────────┬──────────────┘
                                         │
-      SSE  meta → chunk… → done         ▼
-   ◀────────────────────────  AI provider (Claude / OpenAI / Ollama / Gemini)
+      SSE  meta → chunk… → done         ▼                    in parallel
+   ◀────────────────────────  representative's reply  ·  extractCustomerDetails()
                                         │
                                         ▼
                         ┌──────────────────────────────┐
                         │  Persistence (best effort)   │
                         │  conversations · messages    │
-                        │  tickets · notifications     │
-                        │  system_logs                 │
-                        └──────────────────────────────┘
+                        │  syncCapture() → leads ·     │
+                        │  meetings · tickets          │
+                        │  notifications · system_logs │
+                        └───────────────┬──────────────┘
+      SSE  capture {records}            │
+   ◀────────────────────────────────────┘
 
   WhatsApp ──▶ /webhook ──▶ handler.ts ──▶ same planAssistantTurn()
   Staff ────▶ /admin  ──▶ middleware ──▶ requireAdmin() ──▶ Prisma queries
@@ -69,9 +73,11 @@ rather than something a routine schema change could do by accident.
 
 ### Presentation
 - `src/app/page.tsx`, `about/` — public pages on the midnight surface.
-- `src/app/(chat)/chat` — the concierge. `ChatWindow` owns the transcript, the
-  streaming request and the open workflow form; on wide screens a rail offers
-  the workflows and the service list, on phones `MenuPanel` does.
+- `src/app/(chat)/chat` — the concierge. `ChatWindow` owns the transcript and
+  the streaming request; on wide screens a rail offers the common requests and
+  the service list, on phones `MenuPanel` does. Every entry sends a message —
+  there are no forms. `MessageBubble` shows a receipt under a reply whose turn
+  created a CRM record.
 - `src/app/(admin)/admin` — server-component modules; all data fetching is
   server-side, with small client islands (`StatusSelect`, `ActivityComposer`,
   `BroadcastComposer`, `TemplateToolbar`) for mutations.
@@ -111,13 +117,21 @@ interface AIProvider {
 
 - `knowledge.ts` — keyword-overlap retrieval. Dependency-free by design so the
   system runs anywhere; swapping in vector search touches only this file.
-- `system-prompt.ts` — BITSOL Marketing's identity, scope, catalogue, contacts
-  and the retrieved entries. It also tells the model that individual courses and
-  admissions are not offered, so those questions get an honest answer rather
-  than an invented one.
-- `intents.ts` — deterministic detection of escalation and workflow forms, plus
-  context-aware quick replies. The model writes prose; this module decides what
-  the product *does*, so behaviour stays predictable and testable.
+- `system-prompt.ts` — the customer service representative: BITSOL Marketing's
+  identity, scope, catalogue, contacts, the retrieved entries, what the customer
+  has already told us, what the team still needs, and the rules for asking (help
+  first, one question per message, no fixed order, never twice, no pressure). It
+  also tells the model that individual courses and admissions are not offered,
+  so those questions get an honest answer rather than an invented one.
+- `customer.ts` — a JSON-only model call, run alongside every reply, that reads
+  the transcript for the customer's details, and the validation that keeps
+  invented details out of the CRM: a phone number or email must appear in what
+  the customer typed, BITSOL's own contacts are refused, services must exist and
+  meeting dates must be real future days. Phone numbers and emails are also
+  scanned for deterministically, so a provider outage does not lose them.
+- `intents.ts` — deterministic escalation detection, context-aware quick
+  replies, and `asksQuestion()`, which withholds chips under a reply that is
+  waiting on an answer.
 - `providers/` — Claude (default, `claude-opus-4-8`), OpenAI-compatible, Ollama
   and Gemini. Selection is by `AI_PROVIDER`; nothing else knows which model runs.
 
@@ -132,6 +146,23 @@ Prisma over PostgreSQL. Tables in use: `marketing_leads`, `marketing_services`,
 Chat persistence is **best effort**: a database outage degrades history and
 analytics but never breaks a conversation.
 
+### Conversation capture
+`src/lib/capture.ts` keeps what the customer has told us on
+`conversations.capture` and turns it into records once there is enough to act on:
+
+| Record | Created when |
+| --- | --- |
+| `MarketingLead` | a name, a way to reach them, a need, and real interest (asking for the work, or sharing a number or email) |
+| `Meeting` (`REQUESTED`) | a consultation has a day and a time |
+| `Ticket` (`OPEN`) | an existing client has described a problem and can be reached |
+
+Each is created once per conversation, inside a transaction that locks the
+conversation row, so two WhatsApp messages a second apart cannot create two
+leads. Later turns write back only the fields the customer changed, which keeps
+an edit made in the console from being overwritten by the next message. On
+WhatsApp the sender's number and profile name stand in for details the customer
+has not typed.
+
 ---
 
 ## 4. Streaming protocol
@@ -142,12 +173,12 @@ analytics but never breaks a conversation.
 | --- | --- | --- |
 | `meta` | `{ language }` | Sent **before** generation so the UI can set text direction while the model is still thinking |
 | `chunk` | `{ text }` | Incremental response text |
-| `done` | `{ ticketId?, suggestions?, action? }` | Final state: escalation reference, follow-up chips, and any workflow form to open |
+| `done` | `{ ticketId?, suggestions? }` | The reply is complete: escalation reference and follow-up chips (an empty list when the reply asks a question). The client re-enables the composer here |
+| `capture` | `{ records }` | Sent after `done`, once the turn is stored: the leads, meetings and tickets this turn created, shown as receipts |
 | `error` | `{ message }` | Friendly failure |
 
-`action` is what turns "I want a quote" into a form instead of nine
-conversational turns. The client opens the matching `WorkflowForm`, which POSTs
-to `/api/leads`, `/api/meetings` or `/api/tickets`.
+The stream stays open past `done` only to deliver `capture`, so storing the turn
+and syncing the CRM never make the customer wait to type.
 
 ---
 
@@ -220,8 +251,10 @@ self-hosted (no build-time fetch), and SEO metadata in `layout.tsx`.
 - **Notification delivery** — a worker reads `notifications` (status `QUEUED`)
   and delivers via SMTP/SMS/WhatsApp. Queueing is already wired; transport is
   deliberately out-of-band so a slow provider can't block a request.
-- **Another WhatsApp capture flow** — add a `CaptureFlow` and its steps in
-  `lib/whatsapp/capture.ts`; the flow name is already stored with each capture.
+- **Another customer detail** — add the field to `CustomerDetails` and
+  `DETAIL_LABELS` and describe it in the extraction prompt (`lib/ai/customer.ts`);
+  the representative's prompt and the console's Customer details card pick it up
+  from `DETAIL_LABELS`. Map it to a column in `lib/capture.ts` if the CRM needs it.
 - **Dropping the Institute data** — export it, delete the retired models from
   `schema.prisma`, and create a migration. Review the relations on `User` and
   `Conversation` that point at them first.

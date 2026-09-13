@@ -6,6 +6,13 @@ import { ChannelBadge, PageHeader } from "@/components/admin/ui";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { isOwn, safeQuery } from "@/lib/admin/queries";
+import { readCapture } from "@/lib/capture";
+import {
+  DETAIL_LABELS,
+  MEETING_MODE_LABEL,
+  type CustomerDetails,
+} from "@/lib/ai/customer";
+import { findService } from "@/data/marketing/services";
 import { cn, formatDateTime, isUrduScript } from "@/lib/utils";
 
 export const metadata = { title: "Conversation" };
@@ -26,6 +33,7 @@ export default async function ConversationDetailPage({
           messages: { orderBy: { createdAt: "asc" } },
           tickets: { select: { reference: true, status: true } },
           leads: { select: { id: true, reference: true } },
+          meetings: { select: { reference: true, status: true } },
         },
       }),
     null
@@ -33,6 +41,11 @@ export default async function ConversationDetailPage({
 
   // An archived Institute conversation is not part of this console.
   if (!conversation || !isOwn(conversation.department)) notFound();
+
+  const { details } = readCapture(conversation.capture);
+  const learned = DETAIL_LABELS.filter(([key]) => key !== "requirements" && details[key]).map(
+    ([key, label]) => [label, displayDetail(key, details[key] as string)] as const
+  );
 
   return (
     <>
@@ -87,6 +100,30 @@ export default async function ConversationDetailPage({
         </Card>
 
         <div className="space-y-4">
+          <Card className="p-5">
+            <h2 className="text-sm font-semibold">Customer details</h2>
+            <p className="mb-3 mt-0.5 text-[11px] text-muted-foreground">
+              What the assistant learned in conversation.
+            </p>
+            {learned.length || details.requirements ? (
+              <>
+                <dl className="space-y-2 text-sm">
+                  {learned.map(([label, value]) => (
+                    <Detail key={label} label={label} value={value} />
+                  ))}
+                </dl>
+                {details.requirements && (
+                  <div className={cn(learned.length > 0 && "mt-3 border-t pt-3")}>
+                    <p className="text-[11px] text-muted-foreground">What they need</p>
+                    <p className="mt-1 text-sm leading-relaxed">{details.requirements}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Nothing shared yet.</p>
+            )}
+          </Card>
+
           {conversation.channel === "WHATSAPP" && conversation.contactPhone && (
             <Card className="p-5">
               <h2 className="mb-3 text-sm font-semibold">WhatsApp contact</h2>
@@ -138,13 +175,23 @@ export default async function ConversationDetailPage({
                   <span className="text-muted-foreground">lead</span>
                 </li>
               ))}
+              {conversation.meetings.map((meeting) => (
+                <li key={meeting.reference} className="text-muted-foreground">
+                  <Link href="/admin/meetings" className="font-mono text-primary hover:underline">
+                    {meeting.reference}
+                  </Link>{" "}
+                  consultation · {meeting.status}
+                </li>
+              ))}
               {conversation.tickets.map((ticket) => (
                 <li key={ticket.reference} className="text-muted-foreground">
                   <span className="font-mono text-foreground">{ticket.reference}</span> ticket ·{" "}
                   {ticket.status}
                 </li>
               ))}
-              {!conversation.leads.length && !conversation.tickets.length && (
+              {!conversation.leads.length &&
+                !conversation.meetings.length &&
+                !conversation.tickets.length && (
                 <li className="text-muted-foreground">Nothing captured from this chat.</li>
               )}
             </ul>
@@ -153,6 +200,21 @@ export default async function ConversationDetailPage({
       </div>
     </>
   );
+}
+
+const INTENT_LABEL: Record<string, string> = {
+  PROJECT: "Start a project",
+  CONSULTATION: "Book a consultation",
+  SUPPORT: "Get support",
+  BROWSING: "Just browsing",
+};
+
+function displayDetail(key: keyof CustomerDetails, value: string): string {
+  if (key === "service") return findService(value)?.name ?? value;
+  if (key === "meetingMode") return MEETING_MODE_LABEL[value as keyof typeof MEETING_MODE_LABEL] ?? value;
+  if (key === "intent") return INTENT_LABEL[value] ?? value;
+  if (key === "supportCategory") return value.charAt(0) + value.slice(1).toLowerCase();
+  return value;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

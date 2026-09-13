@@ -5,29 +5,35 @@
  *
  *  Turns a free-text message into the structured things the API layer needs:
  *
- *    • `detectAction()`    — should the client open a form (quote, meeting,
- *      support) instead of collecting eight fields across eight conversational
- *      turns?
  *    • `shouldEscalate()`  — does this need a human, and therefore a ticket?
  *    • `suggestFollowUps()`— the quick-reply chips offered after the answer.
+ *    • `asksQuestion()`    — is the reply waiting on an answer from the customer?
  *
  *  All of it is deterministic keyword work. The model writes the prose; this
  *  module decides what the product does, so behaviour stays predictable and
  *  testable rather than depending on the model remembering to emit a marker.
+ *
+ *  Quotes, consultations and support requests are not detected here: the
+ *  representative collects those details in conversation, and
+ *  `customer.ts` reads them back out.
  * =============================================================================
  */
-import type { ChatAction } from "@/types";
 import { matchService } from "@/data/marketing/services";
 
 // ------------------------------------------------------------ Escalation ----
 
+/**
+ * Explicit requests for a person, and complaints. "Call me" and "your sales
+ * team" are deliberately absent: those are someone asking to be contacted,
+ * which the representative handles by taking their number — a ticket would
+ * interrupt the one conversation most likely to become a client.
+ */
 const ESCALATION_TRIGGERS = [
   "talk to a human", "speak to a human", "talk to someone", "speak to someone",
-  "real person", "human agent", "customer service", "call me", "call back",
-  "callback", "sales team", "your team", "representative",
+  "real person", "human agent", "representative", "live agent",
   "complaint", "complain", "refund", "not happy", "unhappy", "disappointed",
   "not helpful", "useless", "frustrated", "escalate", "manager", "supervisor",
-  "legal", "shikayat", "baat karni hai", "baat karwao", "banda", "insan se baat",
+  "legal", "shikayat", "baat karwao", "banda", "insan se baat",
 ];
 
 /**
@@ -37,46 +43,6 @@ const ESCALATION_TRIGGERS = [
 export function shouldEscalate(message: string): boolean {
   const text = normalise(message);
   return ESCALATION_TRIGGERS.some((trigger) => text.includes(trigger));
-}
-
-// ------------------------------------------------------- Workflow actions ---
-
-const QUOTE_TRIGGERS = [
-  "quote", "quotation", "estimate", "how much would it cost", "send me a price",
-  "price list", "pricing for", "proposal", "budget kitna", "rate kya",
-];
-
-const MEETING_TRIGGERS = [
-  "book a meeting", "book meeting", "schedule a call", "schedule a meeting",
-  "consultation", "appointment", "meet you", "zoom", "google meet",
-  "office visit", "visit your office", "meeting rakhni", "meeting book",
-];
-
-const SUPPORT_TRIGGERS = [
-  "support ticket", "raise a ticket", "open a ticket", "technical issue",
-  "not working", "broken", "bug", "error", "billing issue", "invoice issue",
-  "existing project", "my website is", "my bot is",
-];
-
-/**
- * Decide whether the client should open a structured form after this turn.
- *
- * Returns `undefined` for ordinary informational messages — most turns are just
- * conversation and should not be interrupted by a form.
- */
-export function detectAction(message: string): ChatAction | undefined {
-  const text = normalise(message);
-
-  if (hit(text, QUOTE_TRIGGERS)) {
-    return { kind: "QUOTE_FORM", subject: matchService(text)?.slug };
-  }
-  if (hit(text, MEETING_TRIGGERS)) {
-    return { kind: "MEETING_FORM", subject: matchService(text)?.slug };
-  }
-  if (hit(text, SUPPORT_TRIGGERS)) {
-    return { kind: "SUPPORT_FORM" };
-  }
-  return undefined;
 }
 
 // -------------------------------------------------------- Follow-up chips ---
@@ -108,6 +74,16 @@ export function suggestFollowUps(message: string): string[] {
     "Book a consultation",
     "Talk to the team",
   ];
+}
+
+/**
+ * True when the reply ends on a question to the customer. Quick-reply chips
+ * and buttons are withheld then: offering "Request a quote" underneath "What's
+ * the name of your business?" pulls the customer away from answering.
+ */
+export function asksQuestion(reply: string): boolean {
+  const lastLine = reply.trim().split("\n").pop()?.trim() ?? "";
+  return /[?؟][\s*_)"'”’]*$/.test(lastLine);
 }
 
 // ------------------------------------------------------------------ utils ---

@@ -398,8 +398,8 @@ model Conversation {
   contactPhone String?
   /// WhatsApp profile name, so the console shows a person rather than a number.
   contactName  String?
-  /// In-progress slot filling for channels that have no forms. Shape:
-  /// `{ flow, step, answers, startedAt }` — see `lib/whatsapp/capture.ts`.
+  /// What the customer has told the assistant in conversation, and the lead,
+  /// meeting and ticket it produced. Shape: `CaptureState` in `lib/capture.ts`.
   capture   Json?
   /// Set when a human takes over from the assistant.
   handedOff Boolean     @default(false)

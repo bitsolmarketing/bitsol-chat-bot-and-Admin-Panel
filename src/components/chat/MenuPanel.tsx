@@ -6,7 +6,7 @@ import { ChevronRight, ChevronLeft, X } from "lucide-react";
 import { Logo } from "@/components/branding/Logo";
 import { BRAND } from "@/lib/brands";
 import { MARKETING_MENU } from "@/data/marketing/menu";
-import type { ChatAction, MenuEntry } from "@/types";
+import type { MenuEntry } from "@/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,19 +14,17 @@ import { cn } from "@/lib/utils";
  * room.
  *
  * Renders the menu tree from `data/marketing/menu.ts` one level at a time. A
- * leaf either sends a prompt to the assistant or opens a structured workflow
- * form — the menu itself never knows which; it just forwards the entry.
+ * leaf sends its prompt to the assistant, which takes the conversation from
+ * there.
  */
 export function MenuPanel({
   open,
   onClose,
   onPrompt,
-  onAction,
 }: {
   open: boolean;
   onClose: () => void;
   onPrompt: (prompt: string) => void;
-  onAction: (action: ChatAction) => void;
 }) {
   const [stack, setStack] = useState<MenuEntry[]>([]);
 
@@ -38,11 +36,7 @@ export function MenuPanel({
       setStack((s) => [...s, entry]);
       return;
     }
-    if (entry.action) {
-      onAction(entry.action);
-    } else {
-      onPrompt(entry.prompt);
-    }
+    onPrompt(entry.prompt);
     close();
   }
 

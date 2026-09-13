@@ -46,6 +46,11 @@ const schema = z.object({
 
   AI_PROVIDER: z.enum(["claude", "openai", "ollama", "gemini"]).default("claude"),
   AI_MODEL: z.string().default("claude-opus-4-8"),
+  /**
+   * Model that reads each conversation for the customer's details. Defaults to
+   * AI_MODEL; a smaller model from the same provider is cheaper and plenty.
+   */
+  AI_EXTRACTION_MODEL: optional,
   AI_MAX_TOKENS: z.coerce.number().int().positive().default(1400),
   AI_THINKING: bool(false),
 
@@ -144,6 +149,7 @@ export const config = {
   ai: {
     provider: env.AI_PROVIDER,
     model: env.AI_MODEL,
+    extractionModel: env.AI_EXTRACTION_MODEL || env.AI_MODEL,
     maxTokens: env.AI_MAX_TOKENS,
     thinking: env.AI_THINKING,
     anthropicApiKey: env.ANTHROPIC_API_KEY,

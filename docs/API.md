@@ -33,18 +33,26 @@ Stream an assistant reply. The response is **Server-Sent Events**
 data: {"type":"meta","language":"ur_roman"}
 data: {"type":"chunk","text":"SEO monthly retainer par hota hai, "}
 data: {"type":"chunk","text":"indicative price PKR 60,000/month se shuru…"}
-data: {"type":"done","suggestions":["SEO pricing","SEO process","Request a quote"],"action":{"kind":"QUOTE_FORM","subject":"seo"}}
+data: {"type":"done","suggestions":[]}
+data: {"type":"capture","records":[{"kind":"LEAD","reference":"BM-LEAD-7F3K2Q9A"}]}
 ```
 
 | `type` | Fields | Meaning |
 | --- | --- | --- |
 | `meta` | `language` | Detected language, sent **before** generation so the UI can set text direction |
 | `chunk` | `text` | Incremental assistant text |
-| `done` | `ticketId?`, `suggestions?`, `action?` | Stream complete |
+| `done` | `ticketId?`, `suggestions?` | The reply is complete — re-enable the composer here |
+| `capture` | `records` | CRM records this turn created from what the customer said; sent after `done` |
 | `error` | `message` | A recoverable error to show the user |
 
-`action.kind` is one of `LEAD_FORM`, `QUOTE_FORM`, `MEETING_FORM`,
-`SUPPORT_FORM`. `action.subject` pre-selects a service slug when the user named one.
+`suggestions` is an empty list when the reply ends with a question to the
+customer: chips would pull them away from answering it.
+
+After `done` the stream stays open briefly while the turn is stored and the
+customer's details are synced to the CRM. `capture.records[].kind` is `LEAD`,
+`MEETING` or `TICKET`; each record is reported once, in the turn that created it.
+Always send the same `conversationRef` for one conversation — the details are
+keyed to it.
 
 ### Status codes
 `200` stream started · `400` invalid body · `429` rate limited (30 req / 60 s per IP)
@@ -58,6 +66,10 @@ curl -N http://localhost:3000/api/chat \
 ---
 
 ## POST `/api/leads` — lead capture
+
+The assistant does not call this — it captures leads in conversation (see
+`capture` above). The endpoint remains for other clients, such as a contact form
+on the main website.
 
 ```json
 {
@@ -274,7 +286,9 @@ stops before the assistant is invoked.
 | Outcome                   | Record written                                          |
 | ------------------------- | ------------------------------------------------------- |
 | Any message               | `Conversation` (`channel = WHATSAPP`) + `Message` rows   |
-| Completed quote capture   | `MarketingLead`, `source = WHATSAPP`, stage `NEW`        |
+| Name, need and interest shared in conversation | `MarketingLead`, `source = WHATSAPP`, stage `NEW` |
+| A consultation day and time shared | `Meeting` (`REQUESTED`), linked to the lead |
+| An existing client's problem described | `Ticket` (`OPEN`) with the customer's contact details |
 | "Talk to a human"         | `Ticket` (`OPEN`) + conversation marked `handedOff`      |
 | Every one of the above    | `Notification` for the sales team + `SystemLog` entry    |
 

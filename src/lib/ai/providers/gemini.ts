@@ -17,15 +17,15 @@ export function createGeminiProvider(): AIProvider {
 
   return {
     name: "gemini",
-    async *streamChat({ system, messages }) {
-      const model = config.ai.model || "gemini-2.0-flash";
+    async *streamChat({ system, messages, model: override, maxTokens }) {
+      const model = override || config.ai.model || "gemini-2.0-flash";
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
         model
       )}:streamGenerateContent?alt=sse`;
 
       const body = {
         systemInstruction: { parts: [{ text: system }] },
-        generationConfig: { maxOutputTokens: config.ai.maxTokens },
+        generationConfig: { maxOutputTokens: maxTokens ?? config.ai.maxTokens },
         contents: messages.map((m) => ({
           role: m.role === "assistant" ? "model" : "user",
           parts: [{ text: m.content }],

@@ -19,17 +19,17 @@ export function createClaudeProvider(): AIProvider {
 
   return {
     name: "claude",
-    async *streamChat({ system, messages }) {
+    async *streamChat({ system, messages, model, maxTokens, thinking }) {
       const params: Anthropic.MessageStreamParams = {
-        model: config.ai.model,
-        max_tokens: config.ai.maxTokens,
+        model: model ?? config.ai.model,
+        max_tokens: maxTokens ?? config.ai.maxTokens,
         system,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
       };
 
       // Opt-in adaptive thinking (Opus 4.6+/4.8). The API accepts `adaptive` at
       // runtime; cast keeps us forward-compatible with older SDK typings.
-      if (config.ai.thinking) {
+      if (config.ai.thinking && thinking !== false) {
         (params as unknown as Record<string, unknown>).thinking = {
           type: "adaptive",
           display: "summarized",

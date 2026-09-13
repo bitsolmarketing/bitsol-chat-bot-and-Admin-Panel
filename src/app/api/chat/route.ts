@@ -1,17 +1,20 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import {
+  asksQuestion,
+  extractCustomerDetails,
   planAssistantTurn,
-  streamAssistantReply,
-  detectAction,
   shouldEscalate,
+  streamAssistantReply,
   suggestFollowUps,
+  type CustomerDetails,
 } from "@/lib/ai";
 import { BRAND, DEPARTMENT } from "@/lib/brands";
 import { generateReference, generateConversationReference } from "@/lib/utils";
 import { rateLimit } from "@/lib/redis";
 import { prisma } from "@/lib/db";
 import { logEvent, notifyTeam } from "@/lib/notify";
+import { readCapture, recordsOf, syncCapture, type CaptureState } from "@/lib/capture";
 import type { ChatStreamEvent } from "@/types";
 import type { Language as PrismaLanguage } from "@prisma/client";
 
@@ -61,15 +64,29 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { messages, conversationRef } = parsed.data;
+  const { messages } = parsed.data;
+  const reference = parsed.data.conversationRef ?? generateConversationReference();
 
-  const plan = planAssistantTurn(messages);
+  // What this customer has already told us, so the representative neither asks
+  // twice nor forgets a name given twenty messages ago. Bounded: a slow
+  // database costs this turn its memory, not its reply.
+  const stored = await within(loadCapture(reference), 1500, null);
+  const known: CustomerDetails = stored?.details ?? {};
+
+  const plan = planAssistantTurn(messages, {
+    channel: "WEB",
+    details: known,
+    records: stored ? recordsOf(stored) : undefined,
+  });
+
+  // Started now, alongside the reply, so it has usually finished by the time
+  // the last token is sent.
+  const extraction = extractCustomerDetails(messages, known);
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const userText = lastUser?.content ?? "";
 
   const ticketId = shouldEscalate(userText) ? generateReference("TKT") : undefined;
-  const action = detectAction(userText);
 
   const encoder = new TextEncoder();
   const startedAt = Date.now();
@@ -77,59 +94,74 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let assistantText = "";
+      // The visitor may close the tab mid-reply; the work below still finishes.
+      const send = (event: ChatStreamEvent) => {
+        try {
+          controller.enqueue(encoder.encode(sse(event)));
+        } catch {
+          /* stream already closed by the client */
+        }
+      };
 
       // Tell the client the detected language immediately so it can switch
       // text direction while the model is still generating.
-      controller.enqueue(encoder.encode(sse({ type: "meta", language: plan.language })));
+      send({ type: "meta", language: plan.language });
 
       try {
         for await (const chunk of streamAssistantReply(messages, plan)) {
           assistantText += chunk;
-          controller.enqueue(encoder.encode(sse({ type: "chunk", text: chunk })));
+          send({ type: "chunk", text: chunk });
         }
 
         if (ticketId) {
           const note = `\n\n🎫 I've created ticket **${ticketId}** and passed this to the ${BRAND.name} team. Keep this reference for follow-up — you can also reach them on ${BRAND.contact.phone}.`;
           assistantText += note;
-          controller.enqueue(encoder.encode(sse({ type: "chunk", text: note })));
+          send({ type: "chunk", text: note });
         }
 
-        controller.enqueue(
-          encoder.encode(
-            sse({
-              type: "done",
-              ticketId,
-              suggestions: suggestFollowUps(userText),
-              action,
-            })
-          )
-        );
+        send({
+          type: "done",
+          ticketId,
+          suggestions: asksQuestion(assistantText) ? [] : suggestFollowUps(userText),
+        });
       } catch (err) {
         console.error("[chat] stream error:", err);
-        controller.enqueue(
-          encoder.encode(
-            sse({
-              type: "error",
-              message:
-                "Sorry, I'm having trouble responding right now. Please try again in a moment.",
-            })
-          )
-        );
-      } finally {
-        controller.close();
+        send({
+          type: "error",
+          message: "Sorry, I'm having trouble responding right now. Please try again in a moment.",
+        });
       }
 
-      // --- Best-effort persistence (skips silently if the DB is down) -------
-      void persist({
-        conversationRef,
-        language: LANGUAGE_MAP[plan.language],
-        userText,
-        assistantText,
-        ticketId,
-        latencyMs: Date.now() - startedAt,
-      }).catch((e) =>
-        console.warn("[chat] persistence skipped:", e?.message ?? e)
-      );
+      // --- Best-effort persistence and CRM capture ----------------------------
+      // The client re-enables the composer on `done`, so nobody waits on this.
+      // The stream stays open only to report records the turn created.
+      try {
+        const conversationId = await persist({
+          reference,
+          language: LANGUAGE_MAP[plan.language],
+          userText,
+          assistantText,
+          ticketId,
+          known,
+          latencyMs: Date.now() - startedAt,
+        });
+
+        const captured = await syncCapture(
+          { conversationId, source: "CHATBOT" },
+          await extraction
+        );
+        if (captured?.created.length) {
+          send({ type: "capture", records: captured.created });
+        }
+      } catch (e) {
+        console.warn("[chat] persistence skipped:", (e as Error)?.message ?? e);
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      }
     },
   });
 
@@ -142,18 +174,39 @@ export async function POST(req: NextRequest) {
   });
 }
 
-/** Store the exchange for chat history, CRM context and analytics. */
+/** The capture stored on this conversation, or null for a new or archived one. */
+async function loadCapture(reference: string): Promise<CaptureState | null> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { reference },
+    select: { capture: true, department: true },
+  });
+  if (!conversation) return null;
+  if (conversation.department && conversation.department !== DEPARTMENT) return null;
+  return readCapture(conversation.capture);
+}
+
+/** Resolve with `fallback` if the promise rejects or takes longer than `ms`. */
+function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise.catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
+/**
+ * Store the exchange for chat history, CRM context and analytics. Returns the
+ * conversation id so the capture can be attached to it.
+ */
 async function persist(opts: {
-  conversationRef?: string;
+  reference: string;
   language: PrismaLanguage;
   userText: string;
   assistantText: string;
   ticketId?: string;
+  known: CustomerDetails;
   latencyMs: number;
-}) {
-  const { conversationRef, language, userText, assistantText, ticketId, latencyMs } = opts;
-
-  const reference = conversationRef ?? generateConversationReference();
+}): Promise<string> {
+  const { reference, language, userText, assistantText, ticketId, known, latencyMs } = opts;
 
   const conversation = await prisma.conversation.upsert({
     where: { reference },
@@ -197,6 +250,11 @@ async function persist(opts: {
         category: "GENERAL",
         subject: "Escalated from the BITSOL AI Assistant",
         description: userText,
+        // Whatever the representative had already learned, so the person who
+        // picks this up can call back without reading the whole transcript.
+        contactName: known.name ?? null,
+        contactPhone: known.phone ?? null,
+        contactEmail: known.email ?? null,
         conversationId: conversation.id,
       },
     });
@@ -208,7 +266,20 @@ async function persist(opts: {
 
     await notifyTeam({
       subject: `Human handoff requested — ${ticketId}`,
-      body: `A visitor asked for a human.\n\nTicket: ${ticketId}\nConversation: ${reference}\n\nTheir message:\n${userText}`,
+      body: [
+        "A visitor asked for a human.",
+        "",
+        `Ticket: ${ticketId}`,
+        `Conversation: ${reference}`,
+        known.name ? `Name: ${known.name}` : null,
+        known.phone ? `Phone: ${known.phone}` : null,
+        known.email ? `Email: ${known.email}` : null,
+        "",
+        "Their message:",
+        userText,
+      ]
+        .filter((line) => line !== null)
+        .join("\n"),
       link: `/admin/support/tickets`,
     });
 
@@ -219,4 +290,6 @@ async function persist(opts: {
       message: "Assistant escalated a conversation to a human.",
     });
   }
+
+  return conversation.id;
 }

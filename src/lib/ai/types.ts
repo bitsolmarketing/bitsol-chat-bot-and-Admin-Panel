@@ -7,6 +7,12 @@ export interface ChatTurn {
 export interface StreamChatOptions {
   system: string;
   messages: ChatTurn[];
+  /** Overrides AI_MODEL — the details extractor can run on a smaller model. */
+  model?: string;
+  /** Overrides AI_MAX_TOKENS. */
+  maxTokens?: number;
+  /** Set false to skip AI_THINKING for a call that only needs to return JSON. */
+  thinking?: boolean;
 }
 
 /**
