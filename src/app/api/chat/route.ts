@@ -26,7 +26,10 @@ const bodySchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().min(1).max(4000),
+        // Empty is allowed and dropped below: a reply the model failed to
+        // produce sits in the client's transcript as an empty turn, and
+        // rejecting it here would fail every message after it.
+        content: z.string().max(4000),
       })
     )
     .min(1)
@@ -64,7 +67,10 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { messages } = parsed.data;
+  const messages = parsed.data.messages.filter((m) => m.content.trim().length > 0);
+  if (!messages.length) {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
   const reference = parsed.data.conversationRef ?? generateConversationReference();
 
   // What this customer has already told us, so the representative neither asks
@@ -111,6 +117,12 @@ export async function POST(req: NextRequest) {
         for await (const chunk of streamAssistantReply(messages, plan)) {
           assistantText += chunk;
           send({ type: "chunk", text: chunk });
+        }
+
+        // A stream with no text — a safety block, or a thinking budget spent
+        // entirely on thoughts — would leave an empty bubble. Say so instead.
+        if (!assistantText.trim()) {
+          throw new Error("The model returned no text.");
         }
 
         if (ticketId) {
@@ -231,16 +243,19 @@ async function persist(opts: {
     });
   }
 
-  await prisma.message.create({
-    data: {
-      conversationId: conversation.id,
-      role: "ASSISTANT",
-      content: assistantText,
-      department: DEPARTMENT,
-      language,
-      latencyMs,
-    },
-  });
+  // A failed turn has no reply worth keeping; the customer's message still is.
+  if (assistantText.trim()) {
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        role: "ASSISTANT",
+        content: assistantText,
+        department: DEPARTMENT,
+        language,
+        latencyMs,
+      },
+    });
+  }
 
   if (ticketId) {
     await prisma.ticket.create({

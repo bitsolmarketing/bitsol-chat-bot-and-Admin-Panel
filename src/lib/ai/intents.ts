@@ -77,13 +77,26 @@ export function suggestFollowUps(message: string): string[] {
 }
 
 /**
- * True when the reply ends on a question to the customer. Quick-reply chips
- * and buttons are withheld then: offering "Request a quote" underneath "What's
- * the name of your business?" pulls the customer away from answering.
+ * A closing "anything else I can help with?" in the four languages. It ends
+ * with a question mark but is not waiting on an answer — it is the
+ * representative handing the turn back, which is exactly when chips help.
+ */
+const CLOSING_QUESTION =
+  /(anything else|something else|what else|else (i|we) can|aur (kuch|koi|kisi)|(kuch|koi|kisi) aur|mazeed (kuch|koi|madad|maloomat|sawal)|کچھ اور|کوئی اور|کسی اور|مزید (کچھ|کوئی|مدد|معلومات|سوال)|ہور (کجھ|کوئی)|(کجھ|کوئی) ہور)/i;
+
+/**
+ * True when the reply ends on a question the customer is expected to answer.
+ * Quick-reply chips and buttons are withheld then: offering "Request a quote"
+ * underneath "What's the name of your business?" pulls the customer away from
+ * answering. A generic "anything else?" closer does not count.
  */
 export function asksQuestion(reply: string): boolean {
   const lastLine = reply.trim().split("\n").pop()?.trim() ?? "";
-  return /[?؟][\s*_)"'”’]*$/.test(lastLine);
+  if (!/[?؟][\s*_)"'”’]*$/.test(lastLine)) return false;
+  // Only the final sentence decides: "I've noted your number. Anything else?"
+  // hands the turn back even though an earlier sentence may have been a request.
+  const lastSentence = lastLine.split(/(?<=[.!?؟])\s+/).pop() ?? lastLine;
+  return !CLOSING_QUESTION.test(lastSentence);
 }
 
 // ------------------------------------------------------------------ utils ---

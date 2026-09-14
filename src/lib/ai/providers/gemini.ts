@@ -54,7 +54,9 @@ export function createGeminiProvider(): AIProvider {
 
       if (!res.ok || !res.body) {
         const detail = await res.text().catch(() => "");
-        throw new Error(`Gemini error (${res.status}): ${detail.slice(0, 300)}`);
+        // Long enough to keep which quota a 429 hit (per minute or per day),
+        // which Google puts after a paragraph of boilerplate.
+        throw new Error(`Gemini error (${res.status}): ${detail.slice(0, 1200)}`);
       }
 
       yield* parseSSE(res.body, (json) =>

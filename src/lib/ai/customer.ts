@@ -206,6 +206,7 @@ Return ONLY a JSON object with these keys, and null for anything the customer ha
 
 Rules:
 - Record only what the CUSTOMER said. Never copy ${BRAND.name}'s own phone number, email or address, and never record something the representative suggested unless the customer confirmed it.
+- Menu buttons the customer tapped — "Get a quote", "Our services", "Talk to a human" — say nothing about what they need. Leave requirements and service null until they describe it themselves.
 - Messages may be in English, Urdu, Roman Urdu or Punjabi. Write requirements in English. Write names in English letters.
 - When the customer corrects a detail, use the newest value.
 - Keep the details already on file unless the customer changed them.

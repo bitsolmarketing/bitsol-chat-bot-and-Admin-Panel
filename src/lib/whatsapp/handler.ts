@@ -177,8 +177,13 @@ async function route(message: InboundMessage): Promise<void> {
   // --- Everything else is a conversation with the representative ------------
   // "Get a quote" included: the button's title arrives as the customer's
   // message, and the representative asks for what the team needs from there.
+  // A tapped button says nothing new about the customer, though, so that turn
+  // leaves the CRM alone — with the profile name and number already known,
+  // the tap alone would otherwise file a lead with no need in it.
   const history = await loadHistory(conversation.id);
-  await converse(context, history, capture);
+  await converse(context, history, capture, {
+    sync: !answer.startsWith(ACTION_BUTTON_PREFIX),
+  });
 }
 
 // ------------------------------------------------------------------ Context --
@@ -396,7 +401,8 @@ async function sendMenu(context: Context): Promise<void> {
 async function converse(
   context: Context,
   history: ChatTurn[],
-  capture: CaptureState
+  capture: CaptureState,
+  options: { sync: boolean }
 ): Promise<void> {
   const plan = planAssistantTurn(history, {
     channel: "WHATSAPP",
@@ -406,9 +412,9 @@ async function converse(
   });
 
   // Read the customer's details alongside the reply rather than after it.
-  const extraction = extractCustomerDetails(history, capture.details, {
-    channelPhone: context.phone,
-  });
+  const extraction = options.sync
+    ? extractCustomerDetails(history, capture.details, { channelPhone: context.phone })
+    : null;
 
   let text = "";
   try {
@@ -427,6 +433,8 @@ async function converse(
       buttons: asksQuestion(text) ? undefined : quickActions(context.language),
     });
   }
+
+  if (!extraction) return;
 
   const captured = await syncCapture(
     {
