@@ -196,12 +196,47 @@ curl -X PATCH http://localhost:3000/api/admin/leads/clx123 \
 
 | Entity | Writable fields |
 | --- | --- |
-| `leads` | `stage`, `priority`, `estimatedValue`, `lostReason`, `ownerId` |
+| `leads` | `stage` (incl. `HOT`, `FOLLOW_UP`, `SUPPORT`, `SPAM`, `OPTED_OUT`), `priority`, `estimatedValue`, `lostReason`, `ownerId` |
 | `tickets` | `status`, `priority`, `resolution`, `assigneeId` |
 | `meetings` | `status`, `meetingLink`, `notes` |
 | `knowledge` | `state` |
 
 `200` → `{ "ok": true }` · `401` no session · `404` unknown entity/record
+
+### PUT · DELETE `/api/admin/bot-config/{section}`
+
+Chatbot Studio. `PUT` saves one configuration section (body: the section's JSON);
+`DELETE` resets it to the built-in default. Requires `settings.manage`.
+Sections: `contact` `businessHours` `personality` `messages` `menu` `actions`
+`flows` `intents` `options` `countries` `pricing` `teams` `scoring` `enterprise`
+`handover` `followUp` `sources` `proof` `broadcastCategories`.
+
+`200` → `{ "ok": true, "warnings": [] }` · `422` → `{ "ok": false, "issues": ["open: Use 24-hour HH:MM"] }`
+(also returned when a change would reference a menu, flow or button that does not exist)
+
+### POST `/api/admin/bot/simulate`
+
+Runs one WhatsApp turn through the real engine, live configuration and model,
+without sending anything or writing to the CRM. The browser keeps the state and
+sends it back each turn. Requires `settings.manage`.
+
+```json
+{ "input": { "kind": "reply", "text": "WhatBot Pro", "replyId": "n:whatbot" },
+  "phone": "+971501234567", "profileName": "Sara", "history": [], "details": {},
+  "state": null, "records": {}, "turns": 1 }
+```
+
+→ `{ sent: Outgoing[], effects: [{ type, summary, detail }], details, state, records, history, language, optedOut }`
+
+### POST `/api/admin/conversations/{id}/reply`
+
+A person replies to a WhatsApp customer from the console: `{ "text": "…", "pauseBot": true }`.
+`409` once the 24-hour window has closed, `502` with Meta's reason if WhatsApp refuses.
+
+### PATCH `/api/admin/conversations/{id}`
+
+`{ "botPaused": true }` silences the assistant on the thread; `{ "botPaused": false, "handedOff": false }`
+resumes it and closes the handover.
 
 ### POST `/api/admin/activities`
 
@@ -296,6 +331,17 @@ All of them appear in the admin console under Clients ▸ Leads (filterable by
 source), Live Conversations, and Support & Messaging ▸ WhatsApp Inbox.
 
 ---
+
+## GET · POST `/api/cron/follow-ups`
+
+Smart follow-up scheduler. `Authorization: Bearer $CRON_SECRET` (or `?secret=`).
+
+```json
+{ "checked": 12, "sent": 3, "skipped": { "not due yet": 7, "opted out or blocked": 2 } }
+```
+
+`401` wrong secret · `503` `CRON_SECRET` or WhatsApp not configured.
+See [WHATSAPP_ASSISTANT.md §9](WHATSAPP_ASSISTANT.md#9-smart-follow-up).
 
 ## GET `/api/health`
 

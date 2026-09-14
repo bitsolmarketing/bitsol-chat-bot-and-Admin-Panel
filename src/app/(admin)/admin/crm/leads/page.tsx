@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LeadSource, LeadStage, Prisma } from "@prisma/client";
+import type { LeadSource, LeadStage, LeadTemperature, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { safeQuery } from "@/lib/admin/queries";
@@ -13,13 +13,12 @@ import {
 } from "@/components/admin/ui";
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { findService } from "@/data/marketing/services";
+import { LEAD_STAGES, LEAD_TEMPERATURES } from "@/lib/admin/leads";
 import { formatDate, humanise, truncate } from "@/lib/utils";
 
 export const metadata = { title: "Leads" };
 
-const STAGES: LeadStage[] = [
-  "NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST",
-];
+const STAGES = LEAD_STAGES;
 
 const SOURCES: LeadSource[] = [
   "CHATBOT", "WHATSAPP", "WEBSITE", "REFERRAL", "WALK_IN", "SOCIAL", "PHONE", "OTHER",
@@ -28,11 +27,14 @@ const SOURCES: LeadSource[] = [
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ stage?: string; source?: string }>;
+  searchParams: Promise<{ stage?: string; source?: string; temperature?: string }>;
 }) {
   await requireAdmin("/admin/crm/leads");
 
-  const { stage, source } = await searchParams;
+  const { stage, source, temperature } = await searchParams;
+  const activeTemperature = LEAD_TEMPERATURES.includes(temperature as LeadTemperature)
+    ? (temperature as LeadTemperature)
+    : undefined;
   const active = STAGES.includes(stage as LeadStage) ? (stage as LeadStage) : undefined;
   const activeSource = SOURCES.includes(source as LeadSource)
     ? (source as LeadSource)
@@ -41,6 +43,7 @@ export default async function LeadsPage({
   const where: Prisma.MarketingLeadWhereInput = {
     ...(active ? { stage: active } : {}),
     ...(activeSource ? { source: activeSource } : {}),
+    ...(activeTemperature ? { temperature: activeTemperature } : {}),
   };
 
   const { data, error } = await safeQuery(
@@ -48,7 +51,7 @@ export default async function LeadsPage({
       const [leads, stageCounts, sourceCounts] = await Promise.all([
         prisma.marketingLead.findMany({
           where,
-          orderBy: { createdAt: "desc" },
+          orderBy: activeTemperature ? [{ score: "desc" }, { createdAt: "desc" }] : { createdAt: "desc" },
           take: 100,
           include: { owner: { select: { name: true } } },
         }),
@@ -79,12 +82,14 @@ export default async function LeadsPage({
   const total = data.stageCounts.reduce((sum, c) => sum + c._count._all, 0);
   const sourceTotal = data.sourceCounts.reduce((sum, c) => sum + c._count._all, 0);
 
-  const url = (next: { stage?: LeadStage; source?: LeadSource }) => {
+  const url = (next: { stage?: LeadStage; source?: LeadSource; temperature?: LeadTemperature }) => {
     const params = new URLSearchParams();
     const nextStage = "stage" in next ? next.stage : active;
     const nextSource = "source" in next ? next.source : activeSource;
+    const nextTemperature = "temperature" in next ? next.temperature : activeTemperature;
     if (nextStage) params.set("stage", nextStage);
     if (nextSource) params.set("source", nextSource);
+    if (nextTemperature) params.set("temperature", nextTemperature);
     const query = params.toString();
     return query ? `/admin/crm/leads?${query}` : "/admin/crm/leads";
   };
@@ -102,7 +107,7 @@ export default async function LeadsPage({
       {/* Pipeline filter */}
       <div className="scroll-slim mb-3 flex gap-2 overflow-x-auto pb-1">
         <FilterChip href={url({ stage: undefined })} label="All stages" count={total} active={!active} />
-        {STAGES.map((value) => (
+        {STAGES.filter((value) => countForStage(value) > 0 || active === value || !["HOT", "FOLLOW_UP", "SUPPORT", "SPAM", "OPTED_OUT"].includes(value)).map((value) => (
           <FilterChip
             key={value}
             href={url({ stage: value })}
@@ -132,6 +137,19 @@ export default async function LeadsPage({
             />
           )
         )}
+      </div>
+
+      {/* Lead score band — the assistant's view of who to call first */}
+      <div className="scroll-slim mb-4 flex gap-2 overflow-x-auto pb-1">
+        <FilterChip href={url({ temperature: undefined })} label="Any temperature" active={!activeTemperature} />
+        {LEAD_TEMPERATURES.map((value) => (
+          <FilterChip
+            key={value}
+            href={url({ temperature: value })}
+            label={humanise(value)}
+            active={activeTemperature === value}
+          />
+        ))}
       </div>
 
       <DataTable
@@ -179,9 +197,10 @@ export default async function LeadsPage({
             cell: (row) => (
               <div className="min-w-0 max-w-xs">
                 <p className="text-xs font-medium">
-                  {row.serviceSlug
-                    ? findService(row.serviceSlug)?.name ?? humanise(row.serviceSlug)
-                    : "Unspecified"}
+                  {row.subService ??
+                    (row.serviceSlug
+                      ? findService(row.serviceSlug)?.name ?? humanise(row.serviceSlug)
+                      : "Unspecified")}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {truncate(row.requirements, 90)}
@@ -190,8 +209,27 @@ export default async function LeadsPage({
             ),
           },
           {
+            header: "Score",
+            cell: (row) => (
+              <div className="space-y-1 text-xs">
+                <p className="font-semibold tabular-nums">{row.score}</p>
+                <StatusBadge value={row.temperature} />
+              </div>
+            ),
+          },
+          {
             header: "Source",
-            cell: (row) => <SourceBadge value={row.source} />,
+            cell: (row) => (
+              <div className="space-y-1">
+                <SourceBadge value={row.source} />
+                {row.trafficSource && row.trafficSource !== "DIRECT_WHATSAPP" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {humanise(row.trafficSource)}
+                    {row.campaign ? ` · ${truncate(row.campaign, 24)}` : ""}
+                  </p>
+                )}
+              </div>
+            ),
           },
           {
             header: "Budget",

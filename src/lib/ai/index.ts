@@ -5,7 +5,7 @@ import { buildSystemPrompt, type CustomerContext } from "./system-prompt";
 import { getProvider } from "./provider";
 
 export type { AIProvider, ChatTurn } from "./types";
-export type { CustomerContext } from "./system-prompt";
+export type { BotPromptContext, CustomerContext } from "./system-prompt";
 export { getProvider } from "./provider";
 export { retrieveKnowledge } from "./knowledge";
 export { asksQuestion, shouldEscalate, suggestFollowUps } from "./intents";

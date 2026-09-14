@@ -68,6 +68,7 @@ function normalise(
     timestamp: raw.timestamp
       ? new Date(Number(raw.timestamp) * 1000)
       : new Date(),
+    referral: raw.referral,
   };
 
   switch (raw.type) {

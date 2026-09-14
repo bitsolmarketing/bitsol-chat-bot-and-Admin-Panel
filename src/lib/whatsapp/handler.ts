@@ -3,55 +3,40 @@ import type { Language as PrismaLanguage } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { config } from "@/lib/config";
 import { rateLimit } from "@/lib/redis";
-import { logEvent, notifyTeam } from "@/lib/notify";
-import { generateReference, shortId } from "@/lib/utils";
+import { logEvent } from "@/lib/notify";
+import { shortId } from "@/lib/utils";
 import { detectLanguage, type Language } from "@/lib/i18n";
-import { BRAND, DEPARTMENT } from "@/lib/brands";
-import {
-  asksQuestion,
-  extractCustomerDetails,
-  planAssistantTurn,
-  shouldEscalate,
-  streamAssistantReply,
-  type ChatTurn,
-  type CustomerDetails,
-} from "@/lib/ai";
-import { readCapture, recordsOf, syncCapture, type CaptureState } from "@/lib/capture";
-import { markAsRead, sendButtons, sendText, toDisplayPhone } from "./client";
-import {
-  ACTION_BUTTON_PREFIX,
-  busyNotice,
-  escalationNotice,
-  mediaAcknowledgement,
-  optOutConfirmation,
-  quickActions,
-  recordReceipt,
-  welcomeMessage,
-} from "./copy";
-import type { InboundMessage, ReplyButton } from "./types";
+import { DEPARTMENT } from "@/lib/brands";
+import type { ChatTurn } from "@/lib/ai";
+import { readCapture, saveTurn } from "@/lib/capture";
+import { getBotConfig } from "@/lib/bot/config";
+import { runTurn } from "@/lib/bot/engine";
+import { attribute, stripRefCode } from "@/lib/bot/source";
+import { readBotState } from "@/lib/bot/types";
+import { createWhatsAppRuntime } from "@/lib/bot/whatsapp-runtime";
+import { markAsRead, toDisplayPhone } from "./client";
+import type { InboundMessage } from "./types";
 
 /**
  * =============================================================================
  *  WhatsApp conversation handler
  * =============================================================================
  *
- *  The WhatsApp equivalent of `app/api/chat/route.ts`. It reuses the exact same
- *  brain — `planAssistantTurn` retrieves from the knowledge base and builds the
- *  system prompt — so an answer given on WhatsApp and the same answer given in
- *  the web widget cannot drift apart.
+ *  The transport side of the WhatsApp growth assistant. For each inbound
+ *  message it:
  *
- *  What differs is everything around the model:
+ *    1. rate-limits the sender and records the contact,
+ *    2. finds the live thread for the number (or opens one, attributing it to
+ *       the ad, `ref:` code or broadcast that brought the customer in),
+ *    3. stores the message — the idempotency gate against Meta's redeliveries,
+ *    4. hands the message to the conversation engine (`lib/bot/engine.ts`)
+ *       with a runtime that talks to WhatsApp, the model and the CRM,
+ *    5. saves what the engine learned and remembers for the next message.
  *
- *    • **No streaming.** WhatsApp takes one finished message, so the stream is
- *      accumulated and sent as one (or several, past 4096 characters).
- *    • **No session.** A phone number is the identity, and the same thread can
- *      span months — so the conversation is resolved from the number.
- *
- *  Details are gathered exactly as on the web: the representative asks for them
- *  in conversation, `extractCustomerDetails` reads them back out, and
- *  `lib/capture.ts` turns them into leads, consultation requests and tickets.
- *  The number the customer is writing from is already known, so it is never
- *  asked for.
+ *  Menus, flows, intents, scoring and handover all live in the engine; this
+ *  file knows nothing about them. The same brain as the website chat answers
+ *  open questions — `planAssistantTurn` retrieves from the knowledge base and
+ *  builds the system prompt — so the two channels cannot drift apart.
  *
  *  Every path is defensive: this runs inside a webhook Meta will retry on any
  *  non-200, so a failure here must be logged and swallowed, never thrown.
@@ -72,18 +57,6 @@ const LANGUAGE_MAP: Record<Language, PrismaLanguage> = {
  */
 const THREAD_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Words that always return the visitor to the top-level menu. */
-const MENU_WORDS = ["menu", "start", "restart", "hi", "hello", "hey", "salam", "assalam o alaikum", "assalamualaikum", "aoa", "السلام علیکم", "مینو"];
-const STOP_WORDS = ["stop", "unsubscribe", "opt out", "band karo"];
-
-/**
- * Button ids from the old two-business welcome menu (`dept:MARKETING`,
- * `dept:INSTITUTE`). Those messages are still sitting in people's chats, and a
- * tap on one should land somewhere sensible rather than reach the model as
- * "Institute".
- */
-const LEGACY_DEPARTMENT_BUTTON_PREFIX = "dept:";
-
 /** Handle one inbound customer message end to end. */
 export async function handleInbound(message: InboundMessage): Promise<void> {
   try {
@@ -103,6 +76,7 @@ export async function handleInbound(message: InboundMessage): Promise<void> {
 async function route(message: InboundMessage): Promise<void> {
   const waId = message.waId;
   const phone = toDisplayPhone(waId);
+  const now = new Date();
 
   // A runaway sender must not be able to burn the AI budget. Fails open when
   // Redis is absent, exactly like the web chat.
@@ -116,84 +90,76 @@ async function route(message: InboundMessage): Promise<void> {
   // Staff can silence a number without disconnecting the integration.
   if (contact.isBlocked) return;
 
-  const conversation = await resolveConversation(waId, phone, contact.profileName);
+  const botConfig = await getBotConfig();
+  const text = stripRefCode(message.text);
+  const { conversation, created } = await resolveConversation(message, phone, contact.profileName, botConfig.sources);
 
   // Idempotency gate. Meta redelivers until it sees a 200, and this insert is
   // the thing that makes a redelivery harmless: the second attempt violates the
   // unique index on `externalId` and we stop before answering twice.
-  const stored = await recordInbound(conversation.id, message);
+  const stored = await recordInbound(conversation.id, message, text);
   if (!stored) return;
 
   void markAsRead(message.id).catch(() => {});
 
-  const language = resolveLanguage(message, conversation.language);
-  const context: Context = {
+  const language = resolveLanguage(message, text, conversation.language);
+  const capture = readCapture(conversation.capture);
+  const state = readBotState(capture.bot);
+  const history = await loadHistory(conversation.id);
+
+  if (created) {
+    await prisma.botEvent
+      .create({
+        data: {
+          type: "CONVERSATION_STARTED",
+          conversationId: conversation.id,
+          value: conversation.trafficSource ?? "DIRECT_WHATSAPP",
+          metadata: conversation.campaign ? { campaign: conversation.campaign } : undefined,
+        },
+      })
+      .catch(() => {});
+  }
+
+  const runtime = createWhatsAppRuntime({
     waId,
     phone,
-    language,
     conversationId: conversation.id,
     profileName: contact.profileName ?? undefined,
-  };
-
-  const answer = message.replyId ?? message.text;
-  const lowered = answer.trim().toLowerCase();
-
-  // --- Subscription controls ------------------------------------------------
-  if (STOP_WORDS.includes(lowered)) {
-    await prisma.whatsappContact.update({ where: { waId }, data: { optedOut: true } });
-    await say(context, optOutConfirmation(language));
-    return;
-  }
-  if (contact.optedOut && MENU_WORDS.includes(lowered)) {
-    await prisma.whatsappContact.update({ where: { waId }, data: { optedOut: false } });
-  }
-
-  // --- Media and empty messages ---------------------------------------------
-  if (message.kind === "media" && !message.text) {
-    await say(context, mediaAcknowledgement(language));
-    return;
-  }
-  if (message.kind === "unsupported" || (!answer && !message.text)) {
-    await sendMenu(context);
-    return;
-  }
-
-  // --- Menu -----------------------------------------------------------------
-  if (
-    answer === `${ACTION_BUTTON_PREFIX}menu` ||
-    answer.startsWith(LEGACY_DEPARTMENT_BUTTON_PREFIX) ||
-    MENU_WORDS.includes(lowered)
-  ) {
-    return sendMenu(context);
-  }
-
-  const capture = readCapture(conversation.capture);
-
-  // --- Human handoff --------------------------------------------------------
-  if (answer === `${ACTION_BUTTON_PREFIX}human` || shouldEscalate(message.text)) {
-    return escalate(context, message.text, capture.details);
-  }
-
-  // --- Everything else is a conversation with the representative ------------
-  // "Get a quote" included: the button's title arrives as the customer's
-  // message, and the representative asks for what the team needs from there.
-  // A tapped button says nothing new about the customer, though, so that turn
-  // leaves the CRM alone — with the profile name and number already known,
-  // the tap alone would otherwise file a lead with no need in it.
-  const history = await loadHistory(conversation.id);
-  await converse(context, history, capture, {
-    sync: !answer.startsWith(ACTION_BUTTON_PREFIX),
+    language,
+    config: botConfig,
+    history,
+    leadId: capture.leadId,
+    attribution: {
+      trafficSource: conversation.trafficSource,
+      campaign: conversation.campaign,
+      adId: conversation.adId,
+    },
+    now,
   });
-}
 
-// ------------------------------------------------------------------ Context --
+  const result = await runTurn(
+    { kind: message.kind, text, replyId: message.replyId },
+    {
+      config: botConfig,
+      language,
+      phone,
+      profileName: contact.profileName ?? undefined,
+      isNewConversation: created,
+      optedOut: contact.optedOut,
+      botPaused: conversation.botPaused,
+      details: capture.details,
+      state,
+      records: {
+        lead: capture.leadReference,
+        meeting: capture.meetingReference,
+        ticket: capture.ticketReference,
+      },
+      now,
+    },
+    runtime
+  );
 
-interface Context {
-  waId: string;
-  phone: string;
-  language: Language;
-  conversationId: string;
-  profileName?: string;
+  await saveTurn(conversation.id, result.details, result.state, runtime.records);
 }
 
 // ------------------------------------------------------------- Conversation --
@@ -223,11 +189,16 @@ async function upsertContact(message: InboundMessage, phone: string) {
  * assistant recalls the service discussed an hour ago, and the CRM shows one
  * coherent transcript instead of a row per message.
  *
- * A thread that belonged to the retired BITSOL Institute is never reused — the
- * console hides it, so continuing it would file new messages where nobody on
- * the team can see them.
+ * A new thread is attributed once, from its first message. A thread that
+ * belonged to the retired BITSOL Institute is never reused — the console hides
+ * it, so continuing it would file new messages where nobody can see them.
  */
-async function resolveConversation(waId: string, phone: string, profileName: string | null) {
+async function resolveConversation(
+  message: InboundMessage,
+  phone: string,
+  profileName: string | null,
+  sources: Parameters<typeof attribute>[1]
+) {
   const since = new Date(Date.now() - THREAD_WINDOW_MS);
 
   const existing = await prisma.conversation.findFirst({
@@ -244,15 +215,38 @@ async function resolveConversation(waId: string, phone: string, profileName: str
     // The profile name often only arrives on a later delivery; backfill it so
     // the console shows a person rather than a number.
     if (profileName && !existing.contactName) {
-      return prisma.conversation.update({
+      const conversation = await prisma.conversation.update({
         where: { id: existing.id },
         data: { contactName: profileName, title: `WhatsApp · ${profileName}` },
       });
+      return { conversation, created: false };
     }
-    return existing;
+    return { conversation: existing, created: false };
   }
 
-  return prisma.conversation.create({
+  const recentBroadcast = sources.broadcastAttributionDays
+    ? await prisma.broadcastRecipient
+        .findFirst({
+          where: {
+            waId: message.waId,
+            sentAt: { gte: new Date(Date.now() - sources.broadcastAttributionDays * 86_400_000) },
+          },
+          orderBy: { sentAt: "desc" },
+          select: { broadcast: { select: { title: true, reference: true } } },
+        })
+        .catch(() => null)
+    : null;
+
+  const attribution = attribute(
+    {
+      text: message.text,
+      referral: message.referral,
+      recentBroadcast: recentBroadcast?.broadcast,
+    },
+    sources
+  );
+
+  const conversation = await prisma.conversation.create({
     data: {
       reference: `WA-CONV-${shortId(10)}`,
       channel: "WHATSAPP",
@@ -260,8 +254,13 @@ async function resolveConversation(waId: string, phone: string, profileName: str
       contactName: profileName,
       department: DEPARTMENT,
       title: profileName ? `WhatsApp · ${profileName}` : `WhatsApp · ${phone}`,
+      trafficSource: attribution.source,
+      campaign: attribution.campaign ?? null,
+      adId: attribution.adId ?? null,
+      referral: (attribution.referral ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
+  return { conversation, created: true };
 }
 
 /**
@@ -270,9 +269,9 @@ async function resolveConversation(waId: string, phone: string, profileName: str
  * Returns false when the id is already present, which means this is a webhook
  * redelivery of something already answered.
  */
-async function recordInbound(conversationId: string, message: InboundMessage): Promise<boolean> {
+async function recordInbound(conversationId: string, message: InboundMessage, text: string): Promise<boolean> {
   const content =
-    message.text ||
+    text ||
     (message.kind === "media" ? `[${message.mediaKind ?? "attachment"}]` : "[unsupported message]");
 
   try {
@@ -282,16 +281,13 @@ async function recordInbound(conversationId: string, message: InboundMessage): P
         role: "USER",
         content,
         department: DEPARTMENT,
-        language: LANGUAGE_MAP[detectLanguage(message.text)],
+        language: LANGUAGE_MAP[detectLanguage(text)],
         externalId: message.id,
       },
     });
     return true;
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       console.info("[whatsapp] duplicate delivery ignored:", message.id);
       return false;
     }
@@ -304,7 +300,7 @@ async function loadHistory(conversationId: string): Promise<ChatTurn[]> {
   const rows = await prisma.message.findMany({
     where: { conversationId, role: { in: ["USER", "ASSISTANT"] } },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 30,
     select: { role: true, content: true },
   });
 
@@ -322,195 +318,19 @@ async function loadHistory(conversationId: string): Promise<ChatTurn[]> {
  *
  * A button tap carries no language signal — its id is always English — so the
  * conversation's stored language wins there; free text re-detects, which lets
- * someone switch from English to Urdu mid-thread.
+ * someone switch from English to Urdu mid-thread. A two-word answer to a flow
+ * question ("ABC Realtors") says little about language, so it keeps the
+ * conversation's language unless it is clearly Urdu script.
  */
-function resolveLanguage(message: InboundMessage, stored: PrismaLanguage): Language {
-  if (message.kind === "reply" || !message.text.trim()) {
-    const entry = Object.entries(LANGUAGE_MAP).find(([, value]) => value === stored);
-    return (entry?.[0] as Language) ?? "en";
-  }
-  return detectLanguage(message.text);
-}
+function resolveLanguage(message: InboundMessage, text: string, stored: PrismaLanguage): Language {
+  const storedLanguage =
+    (Object.entries(LANGUAGE_MAP).find(([, value]) => value === stored)?.[0] as Language | undefined) ?? "en";
+  if (message.kind === "reply" || !text.trim()) return storedLanguage;
 
-// -------------------------------------------------------------- Responding --
-
-/** Send a reply and record it on the transcript, so the console shows both sides. */
-async function say(
-  context: Context,
-  text: string,
-  options?: { buttons?: ReplyButton[]; footer?: string }
-): Promise<void> {
-  const result = options?.buttons?.length
-    ? await sendButtons(context.waId, text, options.buttons, options.footer)
-    : await sendText(context.waId, text);
-
-  await prisma.message
-    .create({
-      data: {
-        conversationId: context.conversationId,
-        role: "ASSISTANT",
-        content: text,
-        department: DEPARTMENT,
-        language: LANGUAGE_MAP[context.language],
-        externalId: result.messageId,
-      },
-    })
-    .catch((error) => console.warn("[whatsapp] transcript write skipped:", error?.message));
-
-  await prisma.conversation
-    .update({
-      where: { id: context.conversationId },
-      data: { language: LANGUAGE_MAP[context.language], updatedAt: new Date() },
-    })
-    .catch(() => {});
-
-  if (result.ok) {
-    await prisma.whatsappContact
-      .update({ where: { waId: context.waId }, data: { lastOutboundAt: new Date() } })
-      .catch(() => {});
-    return;
-  }
-
-  // A failed send is the one failure mode that is completely invisible from the
-  // outside: the customer simply gets no reply, while the transcript in the
-  // console shows the assistant answering perfectly. Recording it makes the
-  // difference between "the bot is broken" and a specific, fixable cause —
-  // an expired token, a blocked outbound connection, a rejected message.
-  await logEvent({
-    level: "ERROR",
-    action: "whatsapp.send.failed",
-    entity: "WhatsappContact",
-    entityId: context.waId,
-    message: result.error ?? "Unknown error sending to the WhatsApp Cloud API.",
-    metadata: {
-      to: context.phone,
-      shape: options?.buttons?.length ? "buttons" : "text",
-    },
-  });
-}
-
-async function sendMenu(context: Context): Promise<void> {
-  const welcome = welcomeMessage(context.language);
-  await say(context, welcome.text, { buttons: welcome.buttons, footer: welcome.footer });
-}
-
-/**
- * One turn with the representative: answer, then turn whatever the customer
- * has told us into CRM records.
- */
-async function converse(
-  context: Context,
-  history: ChatTurn[],
-  capture: CaptureState,
-  options: { sync: boolean }
-): Promise<void> {
-  const plan = planAssistantTurn(history, {
-    channel: "WHATSAPP",
-    details: capture.details,
-    whatsapp: { number: context.phone, profileName: context.profileName },
-    records: recordsOf(capture),
-  });
-
-  // Read the customer's details alongside the reply rather than after it.
-  const extraction = options.sync
-    ? extractCustomerDetails(history, capture.details, { channelPhone: context.phone })
-    : null;
-
-  let text = "";
-  try {
-    for await (const chunk of streamAssistantReply(history, plan)) text += chunk;
-  } catch (error) {
-    console.error("[whatsapp] model error:", error);
-    text = "";
-  }
-
-  if (!text.trim()) {
-    await say(context, busyNotice(context.language));
-  } else {
-    // The chips under an answer are what turn a question into a lead — but not
-    // under a question, where they would pull the customer away from answering.
-    await say(context, text, {
-      buttons: asksQuestion(text) ? undefined : quickActions(context.language),
-    });
-  }
-
-  if (!extraction) return;
-
-  const captured = await syncCapture(
-    {
-      conversationId: context.conversationId,
-      source: "WHATSAPP",
-      fallback: { name: context.profileName, phone: context.phone },
-    },
-    await extraction
-  );
-
-  if (captured?.created.length) {
-    await say(context, recordReceipt(context.language, captured.created));
-  }
-}
-
-// -------------------------------------------------------------- Escalation --
-
-async function escalate(
-  context: Context,
-  request: string,
-  details: CustomerDetails
-): Promise<void> {
-  const reference = generateReference("TKT");
-
-  try {
-    await prisma.ticket.create({
-      data: {
-        reference,
-        department: DEPARTMENT,
-        category: "GENERAL",
-        status: "OPEN",
-        subject: "Human requested on WhatsApp",
-        description: request || "The customer asked to speak to a person.",
-        contactName: details.name ?? context.profileName ?? null,
-        contactPhone: details.phone ?? context.phone,
-        contactEmail: details.email ?? null,
-        conversationId: context.conversationId,
-      },
-    });
-
-    await prisma.conversation.update({
-      where: { id: context.conversationId },
-      data: { handedOff: true },
-    });
-
-    await notifyTeam({
-      subject: `WhatsApp handoff ${reference} — ${details.name ?? context.profileName ?? context.phone}`,
-      body: [
-        `A WhatsApp customer asked for a human.`,
-        ``,
-        `Ticket: ${reference}`,
-        `WhatsApp: ${context.phone}`,
-        details.name || context.profileName ? `Name: ${details.name ?? context.profileName}` : null,
-        ``,
-        `Their message:`,
-        request || "—",
-        ``,
-        `Reply from ${BRAND.contact.whatsapp} within 24 hours, or a template message will be required.`,
-      ]
-        .filter((line) => line !== null)
-        .join("\n"),
-      link: `/admin/support/tickets`,
-    });
-
-    await logEvent({
-      action: "chat.escalated",
-      entity: "Ticket",
-      entityId: reference,
-      message: `WhatsApp conversation handed to a human (${context.phone}).`,
-      metadata: { channel: "WHATSAPP" },
-    });
-  } catch (error) {
-    console.error("[whatsapp] escalation failed:", error);
-  }
-
-  await say(context, escalationNotice(context.language, reference));
+  const detected = detectLanguage(text);
+  const words = text.trim().split(/\s+/).length;
+  if (words <= 2 && detected !== "ur" && detected !== "pa") return storedLanguage;
+  return detected;
 }
 
 /** Whether the bot should reply at all — the kill switch on the integration. */

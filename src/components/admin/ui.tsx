@@ -124,6 +124,13 @@ const STATUS_TONES: Record<string, string> = {
   WAITING_CUSTOMER: TONE.attention,
   ON_HOLD: TONE.attention,
   HIGH: TONE.attention,
+  // Lead temperature and the assistant's pipeline stages.
+  HIGH_PRIORITY: TONE.bad,
+  HOT: TONE.attention,
+  WARM: TONE.flight,
+  FOLLOW_UP: TONE.attention,
+  SPAM: TONE.bad,
+  OPTED_OUT: TONE.bad,
   // A template Meta paused for quality still exists but stops going out.
   PAUSED: TONE.attention,
   // In flight

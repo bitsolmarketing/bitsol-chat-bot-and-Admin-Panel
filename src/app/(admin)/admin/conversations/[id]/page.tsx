@@ -13,7 +13,9 @@ import {
   type CustomerDetails,
 } from "@/lib/ai/customer";
 import { findService } from "@/data/marketing/services";
-import { cn, formatDateTime, isUrduScript } from "@/lib/utils";
+import { readBotState } from "@/lib/bot/types";
+import { ConversationControls } from "@/components/admin/ConversationControls";
+import { cn, formatDateTime, humanise, isUrduScript } from "@/lib/utils";
 
 export const metadata = { title: "Conversation" };
 
@@ -42,7 +44,28 @@ export default async function ConversationDetailPage({
   // An archived Institute conversation is not part of this console.
   if (!conversation || !isOwn(conversation.department)) notFound();
 
-  const { details } = readCapture(conversation.capture);
+  const capture = readCapture(conversation.capture);
+  const { details } = capture;
+  const bot = readBotState(capture.bot);
+
+  // Staff-written messages are shown as such, and the reply box only opens
+  // while WhatsApp's 24-hour window is.
+  const authorIds = Array.from(new Set(conversation.messages.map((m) => m.authorId).filter(Boolean))) as string[];
+  const [{ data: authors }, { data: contact }] = await Promise.all([
+    safeQuery(() => prisma.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, name: true } }), []),
+    safeQuery(
+      () =>
+        conversation.contactPhone
+          ? prisma.whatsappContact.findUnique({
+              where: { waId: conversation.contactPhone.replace(/\D/g, "") },
+              select: { lastInboundAt: true, optedOut: true },
+            })
+          : Promise.resolve(null),
+      null
+    ),
+  ]);
+  const authorName = new Map(authors.map((author) => [author.id, author.name]));
+  const windowOpen = Boolean(contact?.lastInboundAt && Date.now() - contact.lastInboundAt.getTime() < 24 * 60 * 60 * 1000);
   const learned = DETAIL_LABELS.filter(([key]) => key !== "requirements" && details[key]).map(
     ([key, label]) => [label, displayDetail(key, details[key] as string)] as const
   );
@@ -90,6 +113,7 @@ export default async function ConversationDetailPage({
                       isUser ? "text-primary-foreground/70" : "text-muted-foreground"
                     )}
                   >
+                    {message.authorId ? `${authorName.get(message.authorId) ?? "Team member"} · ` : ""}
                     {formatDateTime(message.createdAt)}
                     {message.latencyMs ? ` · ${message.latencyMs}ms` : ""}
                   </p>
@@ -131,18 +155,42 @@ export default async function ConversationDetailPage({
                 <Detail label="Name" value={conversation.contactName ?? "Not shared"} />
                 <Detail label="Number" value={conversation.contactPhone} />
               </dl>
-              <a
-                href={`https://wa.me/${conversation.contactPhone.replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-[#25D366] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
-              >
-                Reply on WhatsApp
-              </a>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                Free-form replies are only possible within 24 hours of their last message.
-                After that WhatsApp requires an approved template.
-              </p>
+              {contact?.optedOut && (
+                <p className="mt-2 text-[11px] font-medium text-destructive">Opted out of marketing messages</p>
+              )}
+              <div className="mt-4 border-t pt-4">
+                <ConversationControls
+                  conversationId={conversation.id}
+                  botPaused={conversation.botPaused}
+                  handedOff={conversation.handedOff}
+                  windowOpen={windowOpen}
+                />
+              </div>
+            </Card>
+          )}
+
+          {conversation.channel === "WHATSAPP" && (
+            <Card className="p-5">
+              <h2 className="mb-3 text-sm font-semibold">Assistant</h2>
+              <dl className="space-y-2 text-sm">
+                <Detail label="Source" value={conversation.trafficSource ? humanise(conversation.trafficSource) : "—"} />
+                {conversation.campaign && <Detail label="Campaign" value={conversation.campaign} />}
+                {conversation.adId && <Detail label="Ad ID" value={conversation.adId} />}
+                <Detail label="Intent" value={bot.intent ? humanise(bot.intent) : "—"} />
+                <Detail
+                  label="Lead score"
+                  value={bot.score ? `${bot.score.value}/100 · ${humanise(bot.score.temperature)}` : "—"}
+                />
+                {bot.flow && <Detail label="In progress" value={`${humanise(bot.flow.id)}${bot.flow.pending ? ` → ${humanise(bot.flow.pending)}` : ""}`} />}
+                {bot.signals.enterprise && <Detail label="Enterprise" value="Yes" />}
+                {conversation.handoverTeam && <Detail label="Handed to" value={humanise(conversation.handoverTeam)} />}
+                {bot.handover?.reference && <Detail label="Handover ref" value={bot.handover.reference} />}
+              </dl>
+              {bot.trail.length > 0 && (
+                <p className="mt-3 border-t pt-3 text-[11px] leading-relaxed text-muted-foreground">
+                  {bot.trail.join(" → ")}
+                </p>
+              )}
             </Card>
           )}
 
@@ -203,6 +251,7 @@ export default async function ConversationDetailPage({
 }
 
 const INTENT_LABEL: Record<string, string> = {
+  // Only the assistant's four engagement values; `topic` intents are humanised.
   PROJECT: "Start a project",
   CONSULTATION: "Book a consultation",
   SUPPORT: "Get support",
@@ -213,6 +262,7 @@ function displayDetail(key: keyof CustomerDetails, value: string): string {
   if (key === "service") return findService(value)?.name ?? value;
   if (key === "meetingMode") return MEETING_MODE_LABEL[value as keyof typeof MEETING_MODE_LABEL] ?? value;
   if (key === "intent") return INTENT_LABEL[value] ?? value;
+  if (key === "topic") return humanise(value);
   if (key === "supportCategory") return value.charAt(0) + value.slice(1).toLowerCase();
   return value;
 }

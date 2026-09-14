@@ -114,6 +114,10 @@ const schema = z.object({
   // --- Team routing --------------------------------------------------------
   /** Inbox that receives new leads, quotes, meetings and escalations. */
   SALES_NOTIFY_EMAIL: optional,
+
+  // --- Scheduled jobs ------------------------------------------------------
+  /** Bearer secret for /api/cron/* endpoints. Unset disables them. */
+  CRON_SECRET: optional,
 });
 
 const parsed = schema.safeParse(process.env);
@@ -240,6 +244,10 @@ export const config = {
 
   routing: {
     salesEmail: env.SALES_NOTIFY_EMAIL,
+  },
+
+  cron: {
+    secret: env.CRON_SECRET,
   },
 } as const;
 

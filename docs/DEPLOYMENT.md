@@ -330,13 +330,15 @@ repository secrets — never in the workflow file.
 
 **Content — do this before announcing the assistant**
 
-- [ ] Review service pricing in `src/data/marketing/services.ts`. Every figure
-      ships as a clearly-labelled placeholder; the assistant presents them as
-      indicative and offers a written quotation, but they should still be real.
-- [ ] Update phone, WhatsApp, email, address and office hours in
-      `src/lib/brands.ts`. The assistant is instructed never to give contact
-      details beyond these values.
-- [ ] Re-run `npm run db:seed` to push the changes into the database.
+- [ ] In **Admin ▸ Chatbot Studio**, confirm Contact details, Business hours,
+      Teams (inboxes and lead owners), Pricing and Our work & results. The
+      assistant quotes only published prices and shows only entered work.
+- [ ] Review the website's service-card figures in `src/data/marketing/services.ts`
+      (the assistant no longer quotes them).
+- [ ] Set `CRON_SECRET` and schedule `/api/cron/follow-ups` every 15–30 minutes:
+      `*/15 * * * * curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://your-domain/api/cron/follow-ups`
+- [ ] Walk the main WhatsApp paths in **Admin ▸ Chatbot Studio ▸ Simulator** —
+      Hi → menus, Get a Quote, "talk to a person", STOP — in English and Roman Urdu.
 - [ ] Walk the Knowledge Base module (`/admin/knowledge`) and confirm every
       entry is accurate and `PUBLISHED`.
 
@@ -353,10 +355,10 @@ repository secrets — never in the workflow file.
 **Smoke test**
 
 - [ ] `/chat` → the welcome screen shows the suggestions and the service rail.
-- [ ] Ask about a service → the answer comes from Marketing content with an
-      indicative price.
-- [ ] Ask about individual courses or admissions → the assistant says they
-      aren't offered and points to Corporate Training, without inventing details.
+- [ ] Ask about a service → the answer comes from Marketing content, and any
+      price is one published in Chatbot Studio.
+- [ ] Ask about courses or admissions → the assistant says they aren't offered
+      and offers the services, without inventing details.
 - [ ] Submit a quote request; confirm the reference appears in `/admin/crm/leads`.
 - [ ] Ask to "talk to a human"; confirm a ticket appears in `/admin/support/tickets`.
 - [ ] `curl https://your-domain/api/health` returns `"status":"healthy"`.

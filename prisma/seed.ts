@@ -224,56 +224,11 @@ async function seedMarketing() {
         sortOrder: index,
       },
     });
-
-    // The catalogue's portfolio lines become browsable portfolio items so the
-    // admin console has real content to manage from day one.
-    for (const [i, item] of service.portfolio.entries()) {
-      const slug = `${service.slug}-case-${i + 1}`;
-      const record = await prisma.marketingService.findUnique({
-        where: { slug: service.slug },
-        select: { id: true },
-      });
-      await prisma.portfolioItem.upsert({
-        where: { slug },
-        update: { summary: item, serviceId: record?.id },
-        create: {
-          slug,
-          department: "MARKETING",
-          title: `${service.name} — case ${i + 1}`,
-          summary: item,
-          tags: [service.group],
-          serviceId: record?.id,
-          sortOrder: i,
-        },
-      });
-    }
   }
   console.log(`   ✔ Marketing services: ${MARKETING_SERVICES.length}`);
 
-  const reviews = [
-    {
-      department: "MARKETING" as Department,
-      author: "Operations Director",
-      role: "Retail group",
-      rating: 5,
-      body: "The WhatsApp automation paid for itself in the first month. Enquiries that used to sit unanswered overnight are now handled instantly.",
-    },
-    {
-      department: "MARKETING" as Department,
-      author: "Managing Partner",
-      role: "Professional services firm",
-      rating: 5,
-      body: "They explained the trade-offs honestly instead of overselling, then delivered on schedule. We own the code and the ad accounts — no lock-in.",
-    },
-  ];
-
-  for (const review of reviews) {
-    const exists = await prisma.review.findFirst({
-      where: { author: review.author, department: review.department },
-    });
-    if (!exists) await prisma.review.create({ data: review });
-  }
-  console.log(`   ✔ Reviews: ${reviews.length}`);
+  // No portfolio items or reviews are seeded. The assistant shows customers
+  // only verified work, which the team enters in Admin → Chatbot Studio → Proof.
 }
 
 // --------------------------------------------------------- Knowledge base ---

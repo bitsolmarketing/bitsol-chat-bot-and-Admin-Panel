@@ -10,6 +10,9 @@ import type { ServiceItem } from "@/types";
  *    Portfolio · FAQ  (+ "Book Meeting" and "Request Quote" are wired as chat
  *    actions rather than data, so they stay consistent across all services).
  *
+ *  PORTFOLIO IS EMPTY ON PURPOSE. The assistant never names clients or results
+ *  it cannot verify; verified work is entered in Admin → Chatbot Studio → Proof.
+ *
  *  PRICING IS A PLACEHOLDER. `pricing.note` is rendered verbatim by the
  *  assistant and the UI so a figure is never presented as a final quotation.
  *  Update these records from Admin → Services once the rate card is signed off;
@@ -33,7 +36,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
     benefits: [
       "Answer every customer instantly, day or night, without adding headcount",
       "Capture and qualify leads while your competitors are still replying to emails",
-      "Cut repetitive support questions by 60–80% so your team handles real work",
+      "Fewer repetitive support questions, so your team handles the real work",
       "Reply in English, Urdu and Roman Urdu — customers stay in their own language",
       "Every conversation logged, searchable and reportable",
     ],
@@ -58,11 +61,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "One-time build + optional monthly support & AI usage retainer",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Multi-department government services assistant (Urdu + English, 24/7)",
-      "Real-estate WhatsApp bot that qualifies buyers before an agent calls",
-      "Clinic appointment bot handling booking, reminders and rescheduling",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Will the chatbot make things up?",
@@ -121,11 +120,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "One-time setup + monthly platform retainer (Meta conversation charges billed at cost)",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Retail brand running weekly catalogue broadcasts to 40k+ opted-in contacts",
-      "Education provider automating fee reminders and class notifications",
-      "Service business capturing bookings entirely inside WhatsApp",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Is this the official WhatsApp API or an unofficial tool?",
@@ -179,11 +174,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Per-workflow build + monthly monitoring and AI usage retainer",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Lead-qualification agent scoring and routing inbound enquiries in real time",
-      "Invoice-processing agent extracting and posting line items automatically",
-      "Reporting agent compiling weekly performance packs from five data sources",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "What is the difference between a chatbot and an AI agent?",
@@ -215,7 +206,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       "Lower cost per lead through continuous creative and audience testing",
       "Creative, media buying and landing pages handled by one accountable team",
       "Clear monthly reporting you can actually act on",
-      "Retargeting that recovers the 95% who don't buy on the first visit",
+      "Retargeting that brings back visitors who didn't buy on the first visit",
     ],
     features: [
       "Meta, Google, TikTok, YouTube and LinkedIn campaign management",
@@ -238,11 +229,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Monthly management retainer (ad spend billed separately, paid directly by you)",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "E-commerce brand scaled to consistent 4x+ return on ad spend",
-      "B2B services firm building a repeatable inbound lead pipeline",
-      "Local retail chain driving measurable store visits from geo campaigns",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Is ad spend included in the retainer?",
@@ -298,11 +285,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Monthly retainer, typically a 6-month minimum engagement",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Services company reaching page one for its main commercial keyword set",
-      "Local business tripling map-pack calls in six months",
-      "Content-led site growing organic sessions consistently month over month",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "How long does SEO take?",
@@ -355,11 +338,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Monthly retainer, tiered by posts and video volume",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Restaurant group growing to a consistently viral short-form content engine",
-      "Fashion brand building a daily posting system with in-house handover",
-      "Professional services firm establishing thought leadership on LinkedIn",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Do you shoot the content too?",
@@ -412,11 +391,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "One-time identity project, priced by scope and application count",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Full identity system for an education institute, print to digital",
-      "Rebrand of a retail chain including signage and packaging",
-      "Startup brand built from naming through to launch collateral",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Do we get the source files?",
@@ -469,11 +444,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Per-project, scoped by screen count and research depth",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Dashboard redesign that cut task completion time substantially",
-      "Mobile banking-style app flows designed and user-tested",
-      "Design system adopted across a multi-product SaaS platform",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Can you design for a product we already have?",
@@ -529,11 +500,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "One-time build + optional monthly care plan (hosting, updates, backups)",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Corporate site with multilingual content and an integrated AI assistant",
-      "E-commerce store with local payment gateway and courier integration",
-      "Institute website with course catalogue and online admission forms",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "WordPress or custom code?",
@@ -587,11 +554,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Per-project (milestone-based) or dedicated monthly team",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Multi-department service platform with AI assistant and admin console",
-      "Institute management system covering admissions, fees and attendance",
-      "Distribution ERP with inventory, invoicing and field-sales app",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Do we own the source code?",
@@ -646,11 +609,7 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       model: "Per-project, plus optional monthly maintenance and release retainer",
       note: PRICE_NOTE,
     },
-    portfolio: [
-      "Customer loyalty app with QR redemption and push campaigns",
-      "Field-force app with offline data capture and route tracking",
-      "Learning app with video lessons, quizzes and progress tracking",
-    ],
+    portfolio: [],
     faqs: [
       {
         question: "Do you handle App Store and Play Store submission?",
@@ -668,66 +627,6 @@ export const MARKETING_SERVICES: ServiceItem[] = [
       "play store", "app store", "mobile application",
     ],
   },
-
-  // ------------------------------------------------------------------ Enablement
-  {
-    slug: "corporate-training",
-    name: "Corporate Training",
-    group: "Enablement",
-    tagline: "Make AI a skill your whole team has, not a tool one person owns.",
-    overview:
-      "Hands-on, role-specific training that gets your team genuinely productive with AI and digital tools. Delivered on-site or online, built around your actual workflows, with exercises using your own documents and processes — not generic slideware.",
-    benefits: [
-      "Immediate productivity gains from day one, on real work",
-      "Reduce dependence on external agencies for routine tasks",
-      "Consistent standards and prompts across the whole team",
-      "Content tailored to each department's actual responsibilities",
-      "Certificates of completion for every participant",
-    ],
-    features: [
-      "AI tools & prompt engineering for business teams",
-      "Digital marketing and social media for in-house marketers",
-      "AI for sales, customer support and operations",
-      "Content creation and design fundamentals",
-      "Data literacy, dashboards and reporting",
-      "Custom curriculum built around your workflows",
-      "Recorded sessions, workbooks and prompt libraries to keep",
-    ],
-    process: [
-      "Skills assessment and training needs analysis",
-      "Curriculum design against your real workflows",
-      "Delivery — on-site, online or hybrid, in cohorts",
-      "Hands-on labs using your own documents and data",
-      "Assessment, certification and manager debrief",
-      "Optional follow-up clinic 30 days later",
-    ],
-    pricing: {
-      startingAt: "From PKR 65,000 / day",
-      model: "Per training day for a cohort, or per-seat for open enrolment",
-      note: PRICE_NOTE,
-    },
-    portfolio: [
-      "AI productivity programme delivered across a multi-branch organisation",
-      "Sales team enablement on AI-assisted outreach and proposal writing",
-      "Marketing department upskilled to run campaigns in-house",
-    ],
-    faqs: [
-      {
-        question: "Can training be delivered at our office?",
-        answer:
-          "Yes — on-site anywhere in Pakistan, online, or a hybrid of both. Cohorts usually work best at 10–20 participants.",
-      },
-      {
-        question: "Do participants get certificates?",
-        answer:
-          "Yes, every participant who completes the assessment receives a BITSOL certificate of completion.",
-      },
-    ],
-    keywords: [
-      "training", "corporate training", "workshop", "team training", "upskilling",
-      "ai training", "staff training", "seminar", "bootcamp for teams",
-    ],
-  },
 ];
 
 /** Grouped view used by the menu panel and the services landing section. */
@@ -736,7 +635,6 @@ export const MARKETING_SERVICE_GROUPS = [
   "Marketing & Growth",
   "Brand & Design",
   "Engineering",
-  "Enablement",
 ] as const;
 
 /** Look up a service by slug. */

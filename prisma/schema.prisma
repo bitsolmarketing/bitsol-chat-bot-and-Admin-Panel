@@ -96,6 +96,11 @@ enum Priority {
 }
 
 /// BITSOL Marketing sales pipeline.
+///
+/// `PROPOSAL_SENT` is the "Proposal" status. The values after `LOST` were added
+/// with the WhatsApp growth assistant: HOT is set by lead scoring, FOLLOW_UP by
+/// the follow-up scheduler, SUPPORT for an existing client's conversation,
+/// SPAM by staff and OPTED_OUT when the contact asks not to be messaged.
 enum LeadStage {
   NEW
   CONTACTED
@@ -104,6 +109,42 @@ enum LeadStage {
   NEGOTIATION
   WON
   LOST
+  HOT
+  FOLLOW_UP
+  SUPPORT
+  SPAM
+  OPTED_OUT
+}
+
+/// Lead score band. Thresholds live in the chatbot configuration.
+enum LeadTemperature {
+  COLD
+  WARM
+  HOT
+  HIGH_PRIORITY
+}
+
+/// Where a conversation came from, as opposed to `Channel` (where it happens)
+/// and `LeadSource` (which surface captured the lead).
+enum TrafficSource {
+  META_ADS
+  GOOGLE_ADS
+  WEBSITE
+  QR_CODE
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  DIRECT_WHATSAPP
+  REFERRAL
+  CAMPAIGN
+  BROADCAST
+  OTHER
+}
+
+enum OptInStatus {
+  UNKNOWN
+  OPTED_IN
+  OPTED_OUT
 }
 
 /// RETIRED — BITSOL Institute admissions pipeline, kept for archived records.
@@ -403,6 +444,20 @@ model Conversation {
   capture   Json?
   /// Set when a human takes over from the assistant.
   handedOff Boolean     @default(false)
+  /// When the handover happened and which team it went to.
+  handedOffAt  DateTime?
+  handoverTeam String?
+  /// Set by staff from the console: the assistant stays silent on this thread
+  /// while a person is replying to it.
+  botPaused Boolean     @default(false)
+  /// Attribution, captured from the first message of the thread — a
+  /// click-to-WhatsApp ad referral, a `ref:` code in a prefilled message, or a
+  /// reply to a broadcast.
+  trafficSource TrafficSource?
+  campaign  String?
+  adId      String?
+  /// Meta's `referral` object, verbatim, when the thread opened from an ad.
+  referral  Json?
   /// 1–5 rating captured by the chat satisfaction widget.
   rating    Int?
   createdAt DateTime    @default(now())
@@ -413,11 +468,13 @@ model Conversation {
   leads      MarketingLead[]
   admissions Admission[]
   meetings   Meeting[]
+  botEvents  BotEvent[]
 
   @@index([userId])
   @@index([department])
   @@index([createdAt])
   @@index([channel, contactPhone, updatedAt])
+  @@index([trafficSource])
   @@map("conversations")
 }
 
@@ -435,6 +492,9 @@ model Message {
   /// webhook redelivery idempotent: Meta retries until it sees a 200, and a
   /// retry then fails the insert instead of answering the customer twice.
   externalId     String?      @unique
+  /// Staff member who wrote an ASSISTANT message from the console. Null for
+  /// the AI assistant, which is how the transcript tells the two apart.
+  authorId       String?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
@@ -456,9 +516,36 @@ model MarketingLead {
   budget       String?
   timeline     String?
   requirements String
+  website      String?
+  country      String?
+  city         String?
+  /// Catalogue-independent service detail, e.g. "Local SEO" or "Meta Ads".
+  subService   String?
+  /// The assistant's intent classification, e.g. WHATSAPP_CHATBOT.
+  intent       String?
+  businessGoal String?
+  challenge    String?
+  companySize  String?
   source       LeadSource @default(CHATBOT)
   stage        LeadStage  @default(NEW)
   priority     Priority   @default(NORMAL)
+  /// 0–100, recomputed on every turn from the weights in the chatbot config.
+  score        Int        @default(0)
+  temperature  LeadTemperature @default(COLD)
+  /// Which scoring rules contributed, e.g. ["Website provided", "Wants demo"].
+  scoreReasons String[]
+  trafficSource TrafficSource?
+  campaign     String?
+  adId         String?
+  /// Team key from the chatbot config (SALES, ENTERPRISE, SUPPORT…).
+  assignedTeam String?
+  conversationSummary String?
+  nextAction   String?
+  lastMessage  String?
+  lastMessageAt DateTime?
+  optInStatus  OptInStatus @default(UNKNOWN)
+  followUpCount  Int       @default(0)
+  lastFollowUpAt DateTime?
   estimatedValue Decimal? @db.Decimal(12, 2)
   lostReason   String?
   ownerId      String?
@@ -476,6 +563,8 @@ model MarketingLead {
   @@index([stage])
   @@index([createdAt])
   @@index([ownerId])
+  @@index([temperature])
+  @@index([trafficSource])
   @@map("marketing_leads")
 }
 
@@ -1273,6 +1362,32 @@ model SystemLog {
   @@index([createdAt])
   @@index([level])
   @@map("system_logs")
+}
+
+/// One thing the WhatsApp assistant did or observed — a menu opened, a quote
+/// requested, a handover, a follow-up sent. The chatbot analytics dashboards
+/// count these, so a metric like "demos requested" is a row count rather than
+/// a guess reconstructed from transcripts.
+///
+/// `type` is a string on purpose: new event kinds should not need a migration.
+/// The values the app writes are listed in `lib/bot/types.ts`.
+model BotEvent {
+  id             String        @id @default(cuid())
+  type           String
+  channel        Channel       @default(WHATSAPP)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  leadId         String?
+  intent         String?
+  team           String?
+  /// The menu node, flow or action involved.
+  value          String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+
+  @@index([type, createdAt])
+  @@index([conversationId])
+  @@map("bot_events")
 }
 
 /// Daily rollup powering the admin dashboard widgets and reports.

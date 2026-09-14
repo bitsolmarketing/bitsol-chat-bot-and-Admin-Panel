@@ -15,6 +15,9 @@ import { rateLimit } from "@/lib/redis";
 import { prisma } from "@/lib/db";
 import { logEvent, notifyTeam } from "@/lib/notify";
 import { readCapture, recordsOf, syncCapture, type CaptureState } from "@/lib/capture";
+import { detectLanguage } from "@/lib/i18n";
+import { getBotConfig } from "@/lib/bot/config";
+import { promptContextFor } from "@/lib/bot/prompt";
 import type { ChatStreamEvent } from "@/types";
 import type { Language as PrismaLanguage } from "@prisma/client";
 
@@ -76,13 +79,19 @@ export async function POST(req: NextRequest) {
   // What this customer has already told us, so the representative neither asks
   // twice nor forgets a name given twenty messages ago. Bounded: a slow
   // database costs this turn its memory, not its reply.
-  const stored = await within(loadCapture(reference), 1500, null);
+  const [stored, botConfig] = await Promise.all([
+    within(loadCapture(reference), 1500, null),
+    getBotConfig(),
+  ]);
   const known: CustomerDetails = stored?.details ?? {};
+  const lastUserText = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
 
   const plan = planAssistantTurn(messages, {
     channel: "WEB",
     details: known,
     records: stored ? recordsOf(stored) : undefined,
+    // Contact details, voice and published pricing from Chatbot Studio.
+    bot: promptContextFor(botConfig, detectLanguage(lastUserText)),
   });
 
   // Started now, alongside the reply, so it has usually finished by the time

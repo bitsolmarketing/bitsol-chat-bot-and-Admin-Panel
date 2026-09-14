@@ -35,7 +35,10 @@ interface Handler {
 
 const leadSchema = z.object({
   stage: z
-    .enum(["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST"])
+    .enum([
+      "NEW", "CONTACTED", "QUALIFIED", "HOT", "PROPOSAL_SENT", "NEGOTIATION", "FOLLOW_UP",
+      "WON", "LOST", "SUPPORT", "SPAM", "OPTED_OUT",
+    ])
     .optional(),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
   estimatedValue: z.number().nonnegative().optional(),

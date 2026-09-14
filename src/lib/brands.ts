@@ -28,6 +28,7 @@ export type Department = typeof DEPARTMENT;
 
 export interface BrandContact {
   phone: string;
+  /** The WhatsApp Business number the AI assistant answers on — BITSOL's WhatsApp number. */
   whatsapp: string;
   email: string;
   address: string;
@@ -53,29 +54,32 @@ export interface BrandProfile {
 }
 
 /**
- * NOTE ON ACCURACY — the phone/WhatsApp number is BITSOL's live business line.
- * The remaining contact fields are representative defaults and should be
- * confirmed before go-live.
+ * NOTE ON ACCURACY — the numbers are BITSOL's live lines: `whatsapp` is the
+ * WhatsApp Business number the AI assistant runs on, and the one to share in
+ * every WhatsApp link, QR code and ad; `phone` is the business phone. The
+ * address and hours are representative defaults and should be confirmed before
+ * go-live.
  *
- * All of it is overridable at runtime from Admin → Settings (`settings` table).
- * The assistant is explicitly instructed never to invent contact details beyond
- * what is supplied here.
+ * The WhatsApp assistant reads its contact details from the chatbot
+ * configuration (Admin → Chatbot Studio), which starts from these values. The
+ * assistant is explicitly instructed never to invent contact details beyond
+ * what is supplied there.
  */
 export const BRAND: BrandProfile = {
   name: "BITSOL Marketing",
   shortName: "BITSOL Marketing",
-  tagline: "Business growth, engineered with Artificial Intelligence.",
+  tagline: "AI-powered growth & digital transformation agency.",
   description:
-    "BITSOL Marketing is a full-service digital and AI solutions company. We build AI chatbots, WhatsApp automation, AI agents, websites, mobile apps and complete brand systems for businesses that want to grow faster with less manual work.",
+    "BITSOL Marketing is an AI-powered growth and digital transformation agency serving businesses internationally. We build AI agents, WhatsApp automation, lead generation and digital marketing systems, websites and software that help businesses generate leads, automate operations, improve customer experience and scale.",
   purpose: [
-    "Business Services",
-    "Digital Solutions",
-    "AI Automation",
-    "Software Development",
+    "AI & Automation",
+    "WhatsApp Solutions",
+    "Digital Marketing & Growth",
+    "Websites & Software",
   ],
   referencePrefix: "BM",
   contact: {
-    phone: "+92 312 0141581",
+    phone: "+92 342 140 5876",
     whatsapp: "+92 312 0141581",
     email: "info@bitsolmarketing.com",
     address: "BITSOL Marketing, Faisalabad",

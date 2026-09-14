@@ -9,13 +9,12 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/session";
 import { safeQuery } from "@/lib/admin/queries";
 import { findService } from "@/data/marketing/services";
+import { LEAD_STAGES } from "@/lib/admin/leads";
 import { formatDateTime, formatPkr, humanise } from "@/lib/utils";
 
 export const metadata = { title: "Lead" };
 
-const STAGES = [
-  "NEW", "CONTACTED", "QUALIFIED", "PROPOSAL_SENT", "NEGOTIATION", "WON", "LOST",
-] as const;
+const STAGES = LEAD_STAGES;
 const PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
 
 export default async function LeadDetailPage({
@@ -34,7 +33,7 @@ export default async function LeadDetailPage({
           where: { id },
           include: {
             owner: { select: { name: true } },
-            conversation: { select: { reference: true } },
+            conversation: { select: { id: true, reference: true } },
             meetings: { orderBy: { preferredDate: "asc" } },
             quotes: { orderBy: { createdAt: "desc" } },
           },
@@ -85,9 +84,52 @@ export default async function LeadDetailPage({
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card className="p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Lead intelligence</h2>
+              <span className="inline-flex items-center gap-2">
+                <span className="text-lg font-bold tabular-nums">{lead.score}</span>
+                <span className="text-xs text-muted-foreground">/ 100</span>
+                <StatusBadge value={lead.temperature} />
+              </span>
+            </div>
+            {lead.scoreReasons.length > 0 && (
+              <p className="mb-3 text-xs text-muted-foreground">{lead.scoreReasons.join(" · ")}</p>
+            )}
+            <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+              <Detail label="Intent" value={lead.intent ? humanise(lead.intent) : "—"} />
+              <Detail label="Team" value={lead.assignedTeam ? humanise(lead.assignedTeam) : "—"} />
+              <Detail label="Business goal" value={lead.businessGoal ?? "—"} />
+              <Detail label="Challenge" value={lead.challenge ?? "—"} />
+              <Detail label="Traffic source" value={lead.trafficSource ? humanise(lead.trafficSource) : "—"} />
+              <Detail label="Campaign" value={lead.campaign ?? "—"} />
+              <Detail label="Ad ID" value={lead.adId ?? "—"} />
+              <Detail label="Opt-in" value={humanise(lead.optInStatus)} />
+              <Detail label="Follow-ups" value={`${lead.followUpCount}${lead.lastFollowUpAt ? ` · last ${formatDateTime(lead.lastFollowUpAt)}` : ""}`} />
+              <Detail label="Last message" value={lead.lastMessageAt ? formatDateTime(lead.lastMessageAt) : "—"} />
+            </dl>
+            {lead.nextAction && (
+              <p className="mt-4 rounded-xl bg-primary/[0.06] px-3 py-2 text-sm">
+                <span className="font-semibold">Next action:</span> {lead.nextAction}
+              </p>
+            )}
+          </Card>
+
+          <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Requirements</h2>
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{lead.requirements}</p>
+            {lead.lastMessage && (
+              <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+                Last customer message: “{lead.lastMessage}”
+              </p>
+            )}
           </Card>
+
+          {lead.conversationSummary && (
+            <Card className="p-5">
+              <h2 className="mb-3 text-sm font-semibold">Handover summary</h2>
+              <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed">{lead.conversationSummary}</pre>
+            </Card>
+          )}
 
           <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Activity & follow-ups</h2>
@@ -129,14 +171,17 @@ export default async function LeadDetailPage({
               <Row icon={Phone} label="Phone" value={lead.phone || "—"} />
               <Row icon={Mail} label="Email" value={lead.email ?? "—"} />
               <Row icon={Building2} label="Company" value={lead.company ?? "—"} />
-              <Row icon={Sparkles} label="Business" value={lead.businessType ?? "—"} />
+              <Row icon={Sparkles} label="Industry" value={lead.businessType ?? "—"} />
+              <Row icon={Sparkles} label="Website" value={lead.website ?? "—"} />
+              <Row icon={Sparkles} label="Country" value={[lead.country, lead.city].filter(Boolean).join(" · ") || "—"} />
+              {lead.companySize && <Row icon={Building2} label="Size" value={lead.companySize} />}
             </dl>
           </Card>
 
           <Card className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Deal</h2>
             <dl className="space-y-2 text-sm">
-              <Detail label="Service" value={service?.name ?? lead.serviceSlug ?? "—"} />
+              <Detail label="Service" value={lead.subService ?? service?.name ?? lead.serviceSlug ?? "—"} />
               <Detail label="Budget" value={lead.budget ?? "—"} />
               <Detail label="Timeline" value={lead.timeline ?? "—"} />
               <Detail label="Estimated value" value={formatPkr(Number(lead.estimatedValue ?? 0))} />
@@ -150,9 +195,16 @@ export default async function LeadDetailPage({
             <ul className="space-y-1.5 text-xs">
               <li className="text-muted-foreground">
                 Conversation:{" "}
-                <span className="font-mono text-foreground">
-                  {lead.conversation?.reference ?? "—"}
-                </span>
+                {lead.conversation ? (
+                  <Link
+                    href={`/admin/conversations/${lead.conversation.id}`}
+                    className="font-mono text-primary hover:underline"
+                  >
+                    {lead.conversation.reference}
+                  </Link>
+                ) : (
+                  <span className="font-mono text-foreground">—</span>
+                )}
               </li>
               <li className="text-muted-foreground">
                 Meetings: <span className="text-foreground">{lead.meetings.length}</span>

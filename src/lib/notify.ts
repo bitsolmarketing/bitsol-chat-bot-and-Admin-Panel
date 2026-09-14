@@ -25,23 +25,29 @@ export interface TeamNotification {
   /** Deep link into the admin console, e.g. `/admin/crm/leads/<id>`. */
   link?: string;
   channel?: NotificationChannel;
+  /**
+   * Specific recipients — a team's inboxes from the chatbot configuration.
+   * Omitted, the notification goes to the sales inbox.
+   */
+  to?: string[];
 }
 
-/** Queue a notification for the sales team's inbox. */
+/** Queue a notification for the sales team's inbox, or for the recipients given. */
 export async function notifyTeam(notification: TeamNotification): Promise<void> {
-  const to = config.routing.salesEmail ?? config.mail.from;
-  if (!to) return;
+  const fallback = config.routing.salesEmail ?? config.mail.from;
+  const recipients = notification.to?.length ? notification.to : fallback ? [fallback] : [];
+  if (!recipients.length) return;
 
   try {
-    await prisma.notification.create({
-      data: {
+    await prisma.notification.createMany({
+      data: recipients.map((to) => ({
         department: DEPARTMENT,
         channel: notification.channel ?? "EMAIL",
         to,
         subject: notification.subject,
         body: notification.body,
         link: notification.link,
-      },
+      })),
     });
   } catch (error) {
     console.warn("[notify] queue skipped:", errorMessage(error));

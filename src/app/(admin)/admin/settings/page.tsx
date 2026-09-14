@@ -14,7 +14,7 @@ export default async function SettingsPage() {
   const { data, error } = await safeQuery(
     () =>
       prisma.setting.findMany({
-        where: OWN_OR_GLOBAL,
+        where: { ...OWN_OR_GLOBAL, NOT: { key: { startsWith: "bot." } } },
         orderBy: [{ group: "asc" }, { key: "asc" }],
       }),
     []
@@ -50,9 +50,13 @@ export default async function SettingsPage() {
       </Card>
 
       <Callout title="Where these values come from">
-        Contact details ship as defaults in <code>src/lib/brands.ts</code> and are overridable
-        through the <code>company.*</code> settings below. The assistant is instructed never to
-        give contact information beyond these values.
+        These are the defaults in <code>src/lib/brands.ts</code>. The WhatsApp assistant and the
+        website chat use the contact details, hours and prices from{" "}
+        <a href="/admin/chatbot/contact" className="font-semibold text-primary hover:underline">
+          Chatbot Studio
+        </a>
+        , which start from these values and can be changed there without a deploy. The assistant
+        never gives contact information beyond those values.
       </Callout>
 
       <h2 className="mb-3 mt-8 text-sm font-semibold">Stored settings</h2>

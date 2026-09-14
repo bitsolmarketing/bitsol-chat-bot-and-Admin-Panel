@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { config } from "@/lib/config";
+import { clampText } from "@/lib/bot/render";
 import type { ListRow, ReplyButton } from "./types";
 
 /**
@@ -193,7 +194,8 @@ export async function sendList(
   body: string,
   buttonLabel: string,
   rows: ListRow[],
-  header?: string
+  header?: string,
+  footer?: string
 ): Promise<SendResult> {
   const usable = rows.slice(0, 10);
   if (!usable.length) return sendText(to, body);
@@ -205,6 +207,7 @@ export async function sendList(
       type: "list",
       ...(header ? { header: { type: "text", text: clamp(header, 60) } } : {}),
       body: { text: clamp(toWhatsAppMarkdown(body), 1024) },
+      ...(footer ? { footer: { text: clamp(footer, 60) } } : {}),
       action: {
         button: clamp(buttonLabel, 20),
         sections: [
@@ -434,9 +437,9 @@ export function verifySignature(rawBody: string, header: string | null): boolean
 
 // ------------------------------------------------------------------ utils ---
 
+/** Shorten without splitting an emoji — a half emoji renders as a broken glyph. */
 function clamp(text: string, max: number): string {
-  const clean = text.trim();
-  return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
+  return clampText(text, max);
 }
 
 /** `923001234567` → `+923001234567`, the form the CRM stores. */

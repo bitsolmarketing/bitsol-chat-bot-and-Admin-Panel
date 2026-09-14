@@ -43,6 +43,24 @@ export interface CaptureState {
   ticketId?: string;
   ticketReference?: string;
   updatedAt?: string;
+  /** The WhatsApp assistant's own memory — `BotState` in `lib/bot/types.ts`. */
+  bot?: unknown;
+}
+
+export type CaptureRecordKind = CapturedRecord["kind"];
+
+/** Narrow what a sync may create — the WhatsApp assistant creates meetings and tickets itself. */
+export interface SyncOptions {
+  only?: CaptureRecordKind[];
+  /** Create the lead now, even without the conversational signals (a flow finished). */
+  forceLead?: boolean;
+  ticket?: {
+    subject?: string;
+    description?: string;
+    priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  };
+  /** Added to a meeting the assistant creates, e.g. what the customer said about the time. */
+  meetingNotes?: string;
 }
 
 export interface CaptureContext {
@@ -50,6 +68,8 @@ export interface CaptureContext {
   source: "CHATBOT" | "WHATSAPP";
   /** What the channel knows without asking — a WhatsApp number and profile name. */
   fallback?: { name?: string; phone?: string };
+  /** Who hears about records this sync creates. Omitted, the sales inbox. */
+  notifyTo?: string[];
 }
 
 export interface CaptureResult {
@@ -96,6 +116,7 @@ export function readCapture(value: unknown): CaptureState {
     ticketId: text("ticketId"),
     ticketReference: text("ticketReference"),
     updatedAt: text("updatedAt"),
+    bot: stored.bot,
   };
 }
 
@@ -115,8 +136,10 @@ export function recordsOf(state: CaptureState): CustomerContext["records"] {
  */
 export async function syncCapture(
   context: CaptureContext,
-  incoming: CustomerDetails
+  incoming: CustomerDetails,
+  options: SyncOptions = {}
 ): Promise<CaptureResult | null> {
+  const wants = (kind: CaptureRecordKind) => !options.only || options.only.includes(kind);
   try {
     const result = await prisma.$transaction(async (tx) => {
       // Serialise syncs for one conversation. Two WhatsApp messages sent a
@@ -141,7 +164,7 @@ export async function syncCapture(
       const reachable = Boolean(phone || details.email);
 
       // --- Lead ---------------------------------------------------------------
-      if (details.intent !== "SUPPORT") {
+      if (wants("LEAD") && (details.intent !== "SUPPORT" || options.forceLead)) {
         const hasNeed = Boolean(details.service || details.requirements || details.intent === "CONSULTATION");
         // Asking what a website costs does not make someone a lead, even on
         // WhatsApp where their number is already known. Asking for the work
@@ -151,12 +174,12 @@ export async function syncCapture(
           details.intent === "CONSULTATION" ||
           Boolean(details.phone || details.email);
 
-        if (!next.leadId && name && reachable && hasNeed && interested) {
+        if (!next.leadId && ((name && reachable && hasNeed && interested) || options.forceLead)) {
           const reference = generateReference("LEAD");
           const lead = await tx.marketingLead.create({
             data: {
               reference,
-              name,
+              name: name ?? "WhatsApp contact",
               phone: phone ?? "",
               ...leadColumns(details),
               source: context.source,
@@ -177,12 +200,18 @@ export async function syncCapture(
       }
 
       // --- Meeting request ----------------------------------------------------
-      if (details.meetingDate && details.meetingTime && name && reachable) {
+      if (wants("MEETING") && details.meetingDate && details.meetingTime && name && reachable) {
         const slot = {
           preferredDate: new Date(`${details.meetingDate}T00:00:00Z`),
           preferredTime: details.meetingTime,
           mode: details.meetingMode ?? ("ZOOM" as const),
-          notes: details.meetingMode ? null : "Meeting type not stated — confirm it with the customer.",
+          notes:
+            [
+              details.meetingMode ? null : "Meeting type not stated — confirm it with the customer.",
+              options.meetingNotes ?? null,
+            ]
+              .filter(Boolean)
+              .join("\n") || null,
         };
 
         if (!next.meetingId && details.meetingDate >= todayInPakistan().iso) {
@@ -232,7 +261,7 @@ export async function syncCapture(
       }
 
       // --- Support ticket -----------------------------------------------------
-      if (details.intent === "SUPPORT" && details.requirements && reachable) {
+      if (wants("TICKET") && details.intent === "SUPPORT" && details.requirements && reachable) {
         const contact = {
           contactName: name ?? null,
           contactPhone: phone ?? null,
@@ -248,9 +277,9 @@ export async function syncCapture(
               department: DEPARTMENT,
               category,
               status: "OPEN",
-              priority: category === "COMPLAINT" ? "HIGH" : "NORMAL",
-              subject: truncate(details.requirements, 120),
-              description: details.requirements,
+              priority: options.ticket?.priority ?? (category === "COMPLAINT" ? "HIGH" : "NORMAL"),
+              subject: truncate(options.ticket?.subject ?? details.requirements, 120),
+              description: options.ticket?.description ?? details.requirements,
               conversationId: context.conversationId,
               ...contact,
             },
@@ -307,7 +336,21 @@ interface CreatedRecord extends CapturedRecord {
 
 type LeadColumns = Pick<
   Prisma.MarketingLeadUncheckedCreateInput,
-  "company" | "email" | "businessType" | "serviceSlug" | "budget" | "timeline" | "requirements"
+  | "company"
+  | "email"
+  | "businessType"
+  | "serviceSlug"
+  | "budget"
+  | "timeline"
+  | "requirements"
+  | "website"
+  | "country"
+  | "city"
+  | "subService"
+  | "intent"
+  | "businessGoal"
+  | "challenge"
+  | "companySize"
 >;
 
 function leadColumns(details: CustomerDetails): LeadColumns {
@@ -319,6 +362,14 @@ function leadColumns(details: CustomerDetails): LeadColumns {
     budget: details.budget ?? null,
     timeline: details.timeline ?? null,
     requirements: requirementsFor(details),
+    website: details.website ?? null,
+    country: details.country ?? null,
+    city: details.city ?? null,
+    subService: details.subService ?? null,
+    intent: details.topic ?? null,
+    businessGoal: details.businessGoal ?? null,
+    challenge: details.challenge ?? null,
+    companySize: details.companySize ?? null,
   };
 }
 
@@ -352,7 +403,13 @@ function requirementsFor(details: CustomerDetails): string {
 
   return [
     need,
-    details.city ? `City: ${details.city}` : null,
+    details.customerType ? `Customers they want: ${details.customerType}` : null,
+    details.leadChannel ? `Current lead source: ${details.leadChannel}` : null,
+    details.monthlyLeads ? `Monthly leads needed: ${details.monthlyLeads}` : null,
+    details.currentMarketing ? `Current marketing: ${details.currentMarketing}` : null,
+    details.monthlyAdSpend ? `Monthly ad spend: ${details.monthlyAdSpend}` : null,
+    details.platform ? `Platform: ${details.platform}` : null,
+    details.features ? `Features: ${details.features}` : null,
     details.meetingDate
       ? `Preferred consultation: ${details.meetingDate}${details.meetingTime ? ` at ${details.meetingTime}` : ""}${
           details.meetingMode ? ` (${MEETING_MODE_LABEL[details.meetingMode]})` : ""
@@ -392,6 +449,7 @@ async function announce(
 
   if (record.kind === "LEAD") {
     await notifyTeam({
+      to: context.notifyTo,
       subject: `New lead ${record.reference} — ${name}${details.company ? ` (${details.company})` : ""}`,
       body: [
         `Reference: ${record.reference}`,
@@ -421,6 +479,7 @@ async function announce(
 
   if (record.kind === "MEETING") {
     await notifyTeam({
+      to: context.notifyTo,
       subject: `Consultation request ${record.reference} — ${name} (${details.meetingDate} ${details.meetingTime})`,
       body: [
         `Reference: ${record.reference}`,
@@ -446,6 +505,7 @@ async function announce(
   }
 
   await notifyTeam({
+    to: context.notifyTo,
     subject: `New ${(details.supportCategory ?? "GENERAL").toLowerCase()} ticket ${record.reference} — ${truncate(details.requirements ?? "", 60)}`,
     body: [
       `Reference: ${record.reference}`,
@@ -466,4 +526,43 @@ async function announce(
     message: `Ticket ${record.reference} raised in conversation on ${channel}.`,
     metadata: { reference: record.reference, category: details.supportCategory, source: context.source },
   });
+}
+
+// ------------------------------------------------------------- Turn state ---
+
+/**
+ * Store the customer's details and the assistant's memory at the end of a
+ * WhatsApp turn. Locked like `syncCapture`, and the record references a sync
+ * wrote during the turn are kept.
+ */
+export async function saveTurn(
+  conversationId: string,
+  details: CustomerDetails,
+  bot: unknown,
+  records: Partial<Pick<CaptureState, "ticketId" | "ticketReference" | "meetingId" | "meetingReference">> = {}
+): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM conversations WHERE id = ${conversationId} FOR UPDATE`;
+      const row = await tx.conversation.findUnique({ where: { id: conversationId }, select: { capture: true } });
+      if (!row) return;
+      const current = readCapture(row.capture);
+      const next: CaptureState = {
+        ...current,
+        ...Object.fromEntries(Object.entries(records).filter(([, value]) => value)),
+        details,
+        bot,
+        updatedAt: new Date().toISOString(),
+      };
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { capture: next as unknown as Prisma.InputJsonValue },
+      });
+    });
+  } catch (error) {
+    console.warn(
+      "[capture] turn save skipped:",
+      error instanceof Error ? error.message.split("\n").find(Boolean) : String(error)
+    );
+  }
 }

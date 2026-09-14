@@ -71,6 +71,19 @@ export interface WhatsAppInboundMessage {
   contacts?: unknown[];
   /** Present when the customer replies to a specific earlier message. */
   context?: { from?: string; id?: string };
+  /**
+   * Present on the first message sent from a click-to-WhatsApp ad or a boosted
+   * post: which ad, its headline and link.
+   */
+  referral?: {
+    source_url?: string;
+    source_id?: string;
+    source_type?: string;
+    headline?: string;
+    body?: string;
+    media_type?: string;
+    ctwa_clid?: string;
+  };
   errors?: Array<{ code?: number; title?: string; message?: string }>;
 }
 
@@ -106,6 +119,8 @@ export interface InboundMessage {
   replyId?: string;
   /** Human label for a media message, used in the transcript. */
   mediaKind?: string;
+  /** Click-to-WhatsApp ad attribution, when Meta supplied it. */
+  referral?: WhatsAppInboundMessage["referral"];
 }
 
 /** Outbound interactive button. WhatsApp allows at most three per message. */

@@ -1,5 +1,8 @@
 import {
+  BarChart3,
   Bell,
+  Bot,
+  FlaskConical,
   BookOpen,
   Boxes,
   Briefcase,
@@ -57,6 +60,14 @@ export const ADMIN_NAV: NavGroup[] = [
         icon: MessagesSquare,
         permission: "conversations.view",
       },
+    ],
+  },
+  {
+    label: "WhatsApp Assistant",
+    items: [
+      { label: "Chatbot Studio", href: "/admin/chatbot", icon: Bot, permission: "settings.manage" },
+      { label: "Simulator", href: "/admin/chatbot/simulator", icon: FlaskConical, permission: "settings.manage" },
+      { label: "Chatbot Analytics", href: "/admin/chatbot/analytics", icon: BarChart3, permission: "reports.view" },
     ],
   },
   {

@@ -37,7 +37,10 @@ digital solutions, AI automation and software development.
       SSE  capture {records}            │
    ◀────────────────────────────────────┘
 
-  WhatsApp ──▶ /webhook ──▶ handler.ts ──▶ same planAssistantTurn()
+  WhatsApp ──▶ /webhook ──▶ handler.ts ──▶ lib/bot/engine.ts (menus, flows,
+                                            intents, scoring, handover) and the
+                                            same planAssistantTurn() for answers
+                                            — see WHATSAPP_ASSISTANT.md
   Staff ────▶ /admin  ──▶ middleware ──▶ requireAdmin() ──▶ Prisma queries
 ```
 

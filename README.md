@@ -28,18 +28,30 @@ real reference number. In English, Urdu, Roman Urdu or Punjabi.
   and the budget in conversation, one question at a time and in no fixed order;
   a receipt with the reference number appears once the team has the request
 - 🎙️ Voice input & voice responses, image/PDF attachment, human handoff with ticketing
-- 🟢 **The same assistant on WhatsApp** — Meta Cloud API webhook, quick-action
-  buttons, the same conversational capture (it never asks for the number the
-  customer is writing from), human handoff. Same knowledge base, same reference
-  numbers. See [WhatsApp chatbot](#-whatsapp-chatbot).
+- 🟢 **A WhatsApp growth assistant** — interactive menus for every BITSOL
+  service *and* natural conversation, qualification flows that never ask twice,
+  30-intent detection, lead scoring, enterprise mode, WhatBot Pro pricing and
+  demos, support tickets, human handover with a full summary, smart follow-ups,
+  ad / QR / broadcast attribution. See [WhatsApp growth assistant](#-whatsapp-growth-assistant)
+  and [docs/WHATSAPP_ASSISTANT.md](docs/WHATSAPP_ASSISTANT.md).
 
 **Business logic**
-- 🏢 12 services, each with overview · benefits · features · process ·
-  pricing placeholder · portfolio · FAQ · book meeting · request quote
+- 🏢 11 catalogue services, each with overview · benefits · features · process ·
+  FAQ, and 40+ WhatsApp service explainers
+- 💰 The assistant quotes only prices published in Chatbot Studio, and names no
+  client, result or testimonial the team has not entered
 - 🗂️ A knowledge base of hand-written company entries plus one entry derived
   from each service, stored in `knowledge_base_marketing`
 
 **Admin console** (`/admin`)
+- **Chatbot Studio** — menus, messages, qualification questions, pricing, teams,
+  numbers, hours, AI personality, scoring, handover, follow-up and attribution
+  rules, all editable and validated without touching code
+- **Simulator** — talk to the real assistant with the live configuration; see
+  what the team would receive, with nothing sent or saved
+- **Chatbot Analytics** — CEO, Sales, Marketing, Support, AI & Automation and
+  Admin dashboards
+- Take over a WhatsApp conversation: reply as a person, pause or resume the assistant
 - Dashboard with won and open pipeline value, win rate, today's chats, new
   leads, upcoming meetings, active projects, most-requested services and a live
   activity feed
@@ -224,40 +236,51 @@ under a row lock, and afterwards writes back only what the customer changed, so
 an edit made in the console survives the next message.
 
 The system prompt keeps the assistant to BITSOL Marketing's scope — asked about
-individual courses or admissions, it says those aren't offered and points to
-Corporate Training for teams instead of inventing an answer.
+courses, training or admissions, it says in one line that those aren't offered
+and offers the services instead of inventing an answer.
 
 ---
 
-## 🟢 WhatsApp chatbot
+## 🟢 WhatsApp growth assistant
 
-The WhatsApp channel is the same assistant, not a second one. A message arriving
-on the business number goes through `planAssistantTurn()` exactly like a web
-message: same knowledge base, same language detection.
+The assistant on the WhatsApp number is built as a sales assistant, support desk,
+lead qualification engine and handover system. Customers tap through menus or
+simply write; both reach the same outcomes — a lead, a quote, a demo, a strategy
+call, a support ticket or a person.
 
 ```
 Customer on WhatsApp
    │
    ▼
-POST /webhook               ── X-Hub-Signature-256 verified, else 401
-   │
-   ├─ Message id already seen?  → stop (Meta retries are harmless)
-   ├─ Contact upserted, thread resolved (24h window → same conversation)
-   │
-   ├─ "menu" / "hi"?            → welcome message + quick actions
-   ├─ Asked for a human?        → ticket + team notification
-   └─ Otherwise (incl. "Get a quote") → the representative replies,
-                                  details are extracted and synced
+POST /webhook ── signature verified · duplicate deliveries ignored · 24h thread
+   │             · first message attributed (ad referral, ref: code, broadcast)
+   ▼
+engine.ts
+   ├─ STOP / start            → opt-out / opt-in, recorded on contact and lead
+   ├─ taps                    → menus, service explainers, buttons, flow answers
+   ├─ upset / "a person"      → handover to the right team with a full summary
+   ├─ enterprise signals      → enterprise mode, urgent heads-up to that team
+   ├─ open flow               → take the answer, skip what's known, ask the next
+   └─ natural language        → quote/demo/support flows, or a grounded answer
+                                with the buttons for its intent
    │
    ▼
-Lead / meeting / ticket with source = WHATSAPP → visible in the console,
-receipt with the reference sent to the customer
+Lead (score · temperature · intent · country · attribution) · quotation ·
+ticket · meeting · handover · hot-lead alert · bot_events → console & analytics
 ```
 
-Every webhook delivery is a cold start, so what the customer has told us lives in
-`conversations.capture` rather than in memory. The WhatsApp number and profile
-name are passed to the representative as already known, so it never asks for a
-number it has.
+Everything it says — menus, questions, prices, teams, scoring and automation —
+lives in **Admin ▸ Chatbot Studio** (`/admin/chatbot`) with shipped defaults in
+`src/data/marketing/bot/`. The full design — menu hierarchy, flows, intents,
+scoring table, CRM fields, handover summary, follow-up rules and dashboards — is
+in [docs/WHATSAPP_ASSISTANT.md](docs/WHATSAPP_ASSISTANT.md).
+
+The engine runs against a runtime interface, so `npm test` drives complete
+conversations (menus, quote flow, Roman Urdu, enterprise, handover, STOP) with no
+network, model or database.
+
+**Smart follow-ups** run from `/api/cron/follow-ups` — schedule it every 15–30
+minutes with `Authorization: Bearer $CRON_SECRET`.
 
 ### Connecting a number
 
@@ -300,8 +323,11 @@ console, the bot just stops replying.
   shows which contacts are still inside the window.
 - **Long answers** are split across bubbles at paragraph boundaries, and the
   assistant's markdown is converted to WhatsApp's `*bold*` / `_italic_`.
-- **`menu`** returns anyone to the welcome message; **`stop`** opts them out of
-  broadcasts (they can still chat).
+- **`menu`** returns anyone to the main menu; **`stop`** opts them out of
+  marketing messages and follow-ups (they can still chat), **`start`** opts back in.
+- **Attribution links.** Prefill `ref:<code>` in wa.me links and QR codes, e.g.
+  `https://wa.me/923120141581?text=Hi%20BITSOL%20ref:qr:expo24`. Codes are managed
+  in Chatbot Studio ▸ Source tracking.
 
 ---
 
@@ -321,6 +347,7 @@ console, the bot just stops replying.
 │   │   └── api/
 │   │       ├── chat/              # streaming chat (SSE)
 │   │       ├── whatsapp/webhook/  # Meta Cloud API webhook (verify + receive)
+│   │       ├── cron/follow-ups/   # smart follow-up scheduler
 │   │       ├── leads/ meetings/ tickets/
 │   │       ├── catalog/ search/ health/ auth/
 │   │       └── admin/             # record updates, CRM activities
@@ -331,18 +358,20 @@ console, the bot just stops replying.
 │   │   ├── splash/ ui/
 │   ├── data/
 │   │   └── marketing/             # services · knowledge base · menu
+│   │       └── bot/               # WhatsApp assistant defaults: menus, flows, copy, pricing
 │   ├── lib/
 │   │   ├── brands.ts              # the BITSOL Marketing profile
 │   │   ├── i18n.ts                # EN / UR / Roman UR / PA
 │   │   ├── ai/                    # retrieval · prompt · intents · customer details · providers
 │   │   ├── capture.ts             # conversation details → leads, meetings, tickets
 │   │   ├── whatsapp/              # Cloud API client · parser · handler
+│   │   ├── bot/                   # WhatsApp engine · detection · scoring · config · runtime
 │   │   ├── admin/queries.ts       # failure-tolerant data access, Institute filter
 │   │   └── auth.ts db.ts redis.ts config.ts notify.ts api.ts session.ts
 │   ├── middleware.ts              # admin console guard
 │   └── types/
 ├── Dockerfile · docker-compose.yml · .env.example
-└── docs/  (ARCHITECTURE.md · DEPLOYMENT.md · API.md)
+└── docs/  (ARCHITECTURE.md · DEPLOYMENT.md · API.md · WHATSAPP_ASSISTANT.md)
 ```
 
 ---
@@ -361,13 +390,18 @@ App on **http://localhost:3000**, Postgres on `5432`, Redis on `6379`.
 
 ## ⚠️ Before going live
 
-Pricing ships as **clearly-labelled placeholders**, and contact details as
-representative defaults. The assistant always presents prices as indicative and
-offers a written quotation for the real figure — but they must still be reviewed:
+The assistant quotes **only** the prices in Chatbot Studio ▸ Pricing (WhatBot
+Pro ships at Rs. 5,000 onboarding + Rs. 2,250/month) and shows only the work the
+team enters under Our work & results. Before going live, review in
+**Admin ▸ Chatbot Studio**:
 
-1. `src/data/marketing/services.ts` — service pricing
-2. `src/lib/brands.ts` — phone, WhatsApp, email, address and hours
-3. Re-run `npm run db:seed` to push the changes into the database
+1. Contact details — WhatsApp (chatbot) +92 312 0141581, phone +92 342 140 5876, email, address, hours
+2. Teams — each team's inbox and the console users new leads are assigned to
+3. Pricing and Our work & results
+4. Follow-up timing — and schedule `/api/cron/follow-ups` with `CRON_SECRET`
+
+The website's service cards still show the placeholder figures in
+`src/data/marketing/services.ts`; review those separately.
 
 ---
 
@@ -379,6 +413,7 @@ offers a written quotation for the real figure — but they must still be review
 | `npm run build`         | Production build (runs `prisma generate`) |
 | `npm start`             | Start the production server               |
 | `npm run typecheck`     | TypeScript check                          |
+| `npm test`              | WhatsApp engine and unit tests            |
 | `npm run prisma:migrate`| Create/apply a dev migration              |
 | `npm run db:seed`       | Seed RBAC, catalogue and knowledge base   |
 | `npm run prisma:studio` | Open Prisma Studio                        |
