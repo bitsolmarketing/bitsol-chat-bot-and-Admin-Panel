@@ -18,6 +18,7 @@ import type { BotConfig } from "@/lib/bot/schema";
 const MARKETING = ["get_quote", "book_strategy_call", "talk_to_expert"];
 const AUTOMATION = ["book_consultation", "get_quote", "talk_to_expert"];
 const BUILD = ["plan_project", "get_quote", "book_consultation"];
+const CONSULT = ["book_consultation", "get_quote", "talk_to_expert"];
 
 export const DEFAULT_INTENTS: BotConfig["intents"] = {
   LEAD_GENERATION: { team: "MARKETING", serviceSlug: "digital-marketing", node: "mk_lead_generation", actions: MARKETING, keywords: [] },
@@ -52,8 +53,20 @@ export const DEFAULT_INTENTS: BotConfig["intents"] = {
   E_COMMERCE: { team: "WEB_SOFTWARE", serviceSlug: "website-development", subService: "E-commerce", node: "ecommerce", actions: BUILD, keywords: [] },
   SOFTWARE: { team: "WEB_SOFTWARE", serviceSlug: "software-development", node: "custom_software", actions: BUILD, keywords: [] },
   MOBILE_APP: { team: "WEB_SOFTWARE", serviceSlug: "mobile-apps", node: "mobile_app", actions: BUILD, keywords: [] },
-  BRANDING: { team: "MARKETING", serviceSlug: "branding", actions: MARKETING, keywords: [] },
-  CONTENT: { team: "MARKETING", serviceSlug: "digital-marketing", subService: "Content Marketing", node: "content_marketing", actions: MARKETING, keywords: [] },
+  BRANDING: { team: "MARKETING", serviceSlug: "branding", node: "brand_identity", actions: MARKETING, keywords: [] },
+  CONTENT: { team: "MARKETING", serviceSlug: "content-marketing", subService: "Content Marketing", node: "content_marketing", actions: MARKETING, keywords: [] },
+  AI_VOICE_AGENT: { team: "AI_AUTOMATION", serviceSlug: "ai-agents", subService: "AI Voice Agents", node: "ai_voice_agents", actions: AUTOMATION, keywords: [] },
+  EMAIL_MARKETING: { team: "MARKETING", serviceSlug: "digital-marketing", subService: "Email Marketing", node: "email_marketing", actions: MARKETING, keywords: [] },
+  INFLUENCER_MARKETING: { team: "MARKETING", serviceSlug: "social-media-marketing", subService: "Influencer Marketing", node: "influencer_marketing", actions: MARKETING, keywords: [] },
+  ERP: { team: "WEB_SOFTWARE", serviceSlug: "software-development", subService: "ERP Solutions", node: "erp_solutions", actions: BUILD, keywords: [] },
+  CLOUD: { team: "WEB_SOFTWARE", serviceSlug: "software-development", subService: "Cloud Solutions", node: "cloud_solutions", actions: BUILD, keywords: [] },
+  UI_UX_DESIGN: { team: "WEB_SOFTWARE", serviceSlug: "ui-ux", subService: "UI/UX Design", node: "ui_ux_design", actions: BUILD, keywords: [] },
+  GRAPHIC_DESIGN: { team: "MARKETING", serviceSlug: "branding", subService: "Graphic Design", node: "graphic_design", actions: MARKETING, keywords: [] },
+  VIDEO: { team: "MARKETING", serviceSlug: "content-marketing", subService: "Video Production", node: "video_editing", actions: MARKETING, keywords: [] },
+  PHOTOGRAPHY: { team: "MARKETING", serviceSlug: "branding", subService: "Photography", node: "photography", actions: MARKETING, keywords: [] },
+  DATA_ANALYTICS: { team: "WEB_SOFTWARE", serviceSlug: "software-development", subService: "Business Intelligence", node: "business_intelligence", actions: CONSULT, keywords: [] },
+  CYBER_SECURITY: { team: "WEB_SOFTWARE", serviceSlug: "software-development", subService: "Cyber Security", node: "cyber_security", actions: CONSULT, keywords: [] },
+  TRADING_TECH: { team: "WEB_SOFTWARE", serviceSlug: "trading-tech", subService: "Trading Tech", node: "trading_tech", actions: CONSULT, keywords: [] },
   PRICING: { team: "SALES", actions: ["get_quote", "book_strategy_call", "talk_to_expert"], keywords: [] },
   QUOTE: { team: "SALES", actions: ["get_quote"], keywords: [] },
   DEMO: { team: "WHATSAPP", actions: ["book_demo"], keywords: [] },

@@ -87,6 +87,55 @@ const SERVICE_KEYWORDS: Partial<Record<BotIntent, Weighted>> = {
     ["software", 4], ["web app", 4], ["web application", 5], ["portal", 3], ["dashboard", 2],
     ["saas", 4], ["erp", 3], ["api integration", 4], ["سافٹ ویئر", 4],
   ],
+  AI_VOICE_AGENT: [
+    ["voice agent", 6], ["voice agents", 6], ["ai voice", 6], ["voice bot", 6], ["voicebot", 6],
+    ["ai calling", 6], ["ai caller", 6], ["calling agent", 5], ["phone agent", 5], ["call center ai", 6],
+  ],
+  EMAIL_MARKETING: [
+    ["email marketing", 6], ["email campaign", 6], ["email campaigns", 6], ["newsletter", 5],
+    ["mailchimp", 5], ["email sequence", 5], ["email automation", 5],
+  ],
+  INFLUENCER_MARKETING: [
+    ["influencer marketing", 6], ["influencer", 5], ["influencers", 5], ["brand ambassador", 4], ["ugc", 4],
+  ],
+  ERP: [["erp", 5], ["erp system", 6], ["erp software", 6], ["odoo", 5], ["enterprise resource planning", 6]],
+  CLOUD: [
+    ["cloud solution", 5], ["cloud solutions", 5], ["cloud hosting", 5], ["cloud migration", 6],
+    ["cloud infrastructure", 6], ["cloud server", 5], ["aws", 4], ["azure", 4], ["google cloud", 5],
+    ["devops", 4], ["hosting", 2],
+  ],
+  UI_UX_DESIGN: [
+    ["ui/ux", 6], ["ux design", 6], ["ui design", 6], ["user experience", 4], ["figma", 5], ["app design", 4],
+  ],
+  GRAPHIC_DESIGN: [
+    ["graphic design", 6], ["graphic designing", 6], ["graphic designer", 6], ["graphics", 3], ["poster", 4],
+    ["flyer", 4], ["brochure", 4], ["banner design", 5], ["packaging design", 5],
+  ],
+  VIDEO: [
+    ["video editing", 6], ["video editor", 5], ["motion graphics", 6], ["animation", 4], ["3d animation", 6],
+    ["3d", 3], ["explainer video", 6], ["reels", 3], ["video ad", 4], ["video ads", 4], ["video", 2], ["ویڈیو", 3],
+  ],
+  PHOTOGRAPHY: [
+    ["photography", 6], ["photographer", 6], ["photoshoot", 6], ["photo shoot", 6], ["product photos", 5],
+    ["product shoot", 5],
+  ],
+  // No bare "bi": in Roman Urdu it means "also".
+  DATA_ANALYTICS: [
+    ["business intelligence", 6], ["power bi", 6], ["powerbi", 6], ["tableau", 6], ["data analytics", 6],
+    ["data analysis", 5], ["analytics dashboard", 6], ["reporting dashboard", 5], ["sales dashboard", 5],
+    ["kpi dashboard", 5], ["data warehouse", 6],
+  ],
+  CYBER_SECURITY: [
+    ["cyber security", 6], ["cybersecurity", 6], ["security audit", 6], ["penetration testing", 6],
+    ["pen test", 6], ["pentest", 6], ["vulnerability", 5], ["malware", 5], ["hacked", 5], ["firewall", 4],
+    ["data security", 5],
+  ],
+  // "Trading" alone stays low: a "trading company" is usually an import/export business.
+  TRADING_TECH: [
+    ["trading bot", 6], ["trading bots", 6], ["algo trading", 6], ["algorithmic trading", 6], ["psx", 6],
+    ["pmex", 6], ["stock market", 5], ["stock exchange", 5], ["crypto", 4], ["crypto bot", 6], ["binance", 5],
+    ["forex", 4], ["backtesting", 6], ["market making", 6], ["trading software", 6], ["trading", 2],
+  ],
 };
 
 /** Request intents: what the customer wants to happen. */

@@ -63,6 +63,13 @@ describe("classification", () => {
     ["Are you hiring? I want to send my CV", "CAREER", undefined, "CAREER"],
     ["Can we become a reseller partner for WhatBot", "PARTNERSHIP", "WHATBOT_PRO", "PARTNERSHIP"],
     ["Hello, tell me about your company", "GENERAL_INQUIRY", undefined, undefined],
+    ["I want a trading bot for PSX", "TRADING_TECH", "TRADING_TECH", undefined],
+    ["We need a Power BI dashboard for our sales team", "DATA_ANALYTICS", "DATA_ANALYTICS", undefined],
+    ["mujhe apni company ke liye ERP system chahiye", "ERP", "ERP", undefined],
+    ["Do you do video editing for reels?", "VIDEO", "VIDEO", undefined],
+    ["Our website got hacked", "CYBER_SECURITY", "CYBER_SECURITY", undefined],
+    ["I need an AI voice agent to answer calls", "AI_VOICE_AGENT", "AI_VOICE_AGENT", undefined],
+    ["Can you set up the WhatsApp Cloud API for us", "WHATSAPP_CHATBOT", "WHATSAPP_CHATBOT", undefined],
   ];
   for (const [message, primary, service, request] of cases) {
     it(message, () => {

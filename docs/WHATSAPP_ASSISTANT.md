@@ -87,25 +87,30 @@ Reply ids: `n:<node>[:page]` menu node · `a:<action>` button · `c:<field>:<i>`
 
 Menus are lists (up to 10 rows). A longer menu is paged behind "➡️ More options", and every sub-menu ends with 🏠 Main Menu. Service explainers use buttons (up to 3) with a "Type *menu* anytime" footer, or a list when there are four actions.
 
+The five service groups and their items follow bitsolmarketing.com's Services and Solutions menus, using the site's names. Keep them in step when the website changes (`src/data/marketing/bot/menu.ts`).
+
 ```
 🏠 Main Menu
 ├─ 🚀 Grow My Business ── 🎯 Generate More Leads [flow lead_generation] · 💰 Increase Sales ·
 │                         📣 Improve Advertising · 🔍 More Google Traffic · 📱 Grow Social Media ·
 │                         🤖 Automate My Business · 🌐 Improve My Website · 🧠 Growth Strategy
 │                         [flow growth, goal-specific questions] · 👨‍💻 Talk to an Expert
-├─ 🤖 AI & Automation ── AI Agents · AI Chatbots · Business Automation · n8n · CRM Automation ·
-│                         AI Sales Agent · AI Customer Support · AI Receptionist ·
-│                         Workflow Automation · Custom AI  → [Book Consultation · Get Quote · Talk to Expert]
-├─ 📱 WhatsApp Solutions ─ WhatsApp AI Chatbot · 🚀 WhatBot Pro · Team Inbox · Lead Management ·
+├─ 🤖 AI Automation ───── AI Agents · Business Automation · 💬 WhatsApp AI Chatbots ▸ · Lead Gen Systems ·
+│  │                      AI Voice Agents · CRM Integration · Workflow Automation
+│  │                      → [Book Consultation · Get Quote · Talk to Expert]
+│  └─ 💬 WhatsApp AI Chatbots ─ WhatsApp AI Chatbot · 🚀 WhatBot Pro · Team Inbox · Lead Management ·
 │                         Broadcasts · Automation · Analytics · CRM Integration · Cloud API ·
 │                         🎥 Book a Demo · 💰 Pricing · 👨‍💻 Talk to Sales
 ├─ 📈 Digital Marketing ── SEO (technical, local, international, e-commerce, enterprise, content,
-│                         AI search, Google Maps) · Meta Ads · Google Ads (incl. YouTube) · TikTok ·
-│                         LinkedIn · Social Media · Content · Lead Generation · Remarketing ·
-│                         Marketing Analytics · Conversion (CRO)
-├─ 🌐 Website & Software ─ Business Website · E-commerce · Web Application · Mobile App · AI Website ·
-│                         Enterprise Platform · CRM Development · AI Software · Custom Software ·
-│                         API Integration  → [📋 Plan My Project (project brief) · Consultation · Expert]
+│                         AI search, Google Maps) · Social Media · Google Ads (incl. YouTube) · Meta Ads ·
+│                         TikTok · Email Marketing · Influencer Marketing · Content Marketing
+├─ 💻 Software Development ─ Website Development · E-commerce · CRM Development · ERP Solutions ·
+│                         Web Applications · Mobile Apps · Cloud Solutions · API Development
+│                         → [📋 Plan My Project (project brief) · Consultation · Expert]
+├─ 🎨 Creative Services ── Brand Identity · Logo Design · UI/UX Design · Graphic Design · Video Editing ·
+│                         Motion Graphics · 3D Animation · Photography
+├─ 🏢 Enterprise & Data ── Business Intelligence · Analytics Dashboards · Cloud Solutions · Cyber Security ·
+│                         Enterprise Software · Trading Tech (PSX, PMEX, crypto)
 ├─ 💼 Our Work & Results ─ Case Studies · Results · Websites · AI Projects · WhatsApp Projects ·
 │                         Campaigns · Client Reviews · Industries  (verified entries only)
 ├─ 💰 Get a Quote          [flow quote]
@@ -152,6 +157,9 @@ When the country is unknown, the country is asked first.
 `AI_CUSTOMER_SUPPORT` `N8N_AUTOMATION` `CRM` `WEBSITE` `E_COMMERCE` `SOFTWARE`
 `MOBILE_APP` `BRANDING` `CONTENT` `PRICING` `QUOTE` `DEMO` `SUPPORT` `BILLING`
 `PARTNERSHIP` `CAREER` `GENERAL_INQUIRY` `HUMAN_HANDOVER` `ENTERPRISE`
+`AI_VOICE_AGENT` `EMAIL_MARKETING` `INFLUENCER_MARKETING` `ERP` `CLOUD`
+`UI_UX_DESIGN` `GRAPHIC_DESIGN` `VIDEO` `PHOTOGRAPHY` `DATA_ANALYTICS`
+`CYBER_SECURITY` `TRADING_TECH`
 
 Each message gets a **service** (what it's about) and a **request** (what should
 happen), for example `"quotation for Google Ads"` → service `GOOGLE_ADS`, request

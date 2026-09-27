@@ -5,9 +5,15 @@ import type { BotConfig } from "@/lib/bot/schema";
  *  WhatsApp assistant — menu tree and actions
  * =============================================================================
  *
+ *  The service menus mirror bitsolmarketing.com: Digital Marketing, Software
+ *  Development and Creative Services from its Services menu, AI Automation and
+ *  Enterprise & Data from its Solutions menu, with the site's item names. When
+ *  the website's services change, change them here too.
+ *
  *  Nodes are a flat map so any node can appear in more than one menu (Talk to
- *  an Expert sits in the main menu and under Grow My Business) and so the
- *  studio can validate references by id.
+ *  an Expert sits in the main menu and under Grow My Business; Cloud Solutions
+ *  under both Software Development and Enterprise & Data) and so the studio can
+ *  validate references by id.
  *
  *  Length limits that WhatsApp enforces, and that these titles respect:
  *    • list row title   24 characters (an emoji counts as 2, some as 5)
@@ -65,7 +71,10 @@ const MAIN: Nodes = {
       ur_roman: "Aaj hum aap ki kya madad kar sakte hain? Koi option chunein — ya seedha apni zaroorat likh dein.",
       ur: "آج ہم آپ کی کیا مدد کر سکتے ہیں؟ کوئی آپشن چنیں — یا سیدھا اپنی ضرورت لکھ دیں۔",
     },
-    children: ["grow", "ai", "whatsapp", "marketing", "web", "work", "quote", "expert", "support"],
+    // The service groups follow bitsolmarketing.com's Services and Solutions
+    // menus. Ten rows is WhatsApp's list limit, so WhatsApp chatbots sit inside
+    // AI Automation — which is also where the website lists them.
+    children: ["grow", "ai", "marketing", "web", "creative", "enterprise_data", "work", "quote", "expert", "support"],
   },
 
   grow: {
@@ -98,11 +107,11 @@ const MAIN: Nodes = {
 
   ai: {
     kind: "menu",
-    title: { en: "🤖 AI & Automation", ur_roman: "🤖 AI & Automation", ur: "🤖 اے آئی اور آٹومیشن" },
+    title: { en: "🤖 AI Automation", ur_roman: "🤖 AI Automation", ur: "🤖 اے آئی آٹومیشن" },
     description: {
-      en: "AI agents, chatbots, n8n and CRM automation",
-      ur_roman: "AI agents, chatbots, n8n aur CRM automation",
-      ur: "اے آئی ایجنٹس، چیٹ بوٹس، n8n اور سی آر ایم آٹومیشن",
+      en: "AI agents, WhatsApp chatbots, voice agents, CRM",
+      ur_roman: "AI agents, WhatsApp chatbots, voice agents, CRM",
+      ur: "اے آئی ایجنٹس، واٹس ایپ چیٹ بوٹس، وائس ایجنٹس، سی آر ایم",
     },
     body: {
       en: "🤖 AI that answers, qualifies, follows up and runs processes around the clock.\n\nPick an area to see what it does and where it fits your business.",
@@ -112,15 +121,12 @@ const MAIN: Nodes = {
     },
     children: [
       "ai_agents",
-      "ai_chatbots",
       "business_automation",
-      "n8n_automation",
+      "whatsapp",
+      "lead_systems",
+      "ai_voice_agents",
       "crm_automation",
-      "ai_sales_agent",
-      "ai_customer_support",
-      "ai_receptionist",
       "workflow_automation",
-      "custom_ai",
     ],
     intent: "AI_AUTOMATION",
     team: "AI_AUTOMATION",
@@ -128,11 +134,11 @@ const MAIN: Nodes = {
 
   whatsapp: {
     kind: "menu",
-    title: { en: "📱 WhatsApp Solutions", ur_roman: "📱 WhatsApp Solutions", ur: "📱 واٹس ایپ سلوشنز" },
+    title: { en: "💬 WhatsApp AI Chatbots", ur_roman: "💬 WhatsApp AI Chatbots", ur: "💬 واٹس ایپ چیٹ بوٹس" },
     description: {
-      en: "AI chatbot, team inbox, broadcasts, WhatBot Pro",
-      ur_roman: "AI chatbot, team inbox, broadcasts, WhatBot Pro",
-      ur: "اے آئی چیٹ بوٹ، ٹیم ان باکس، براڈکاسٹ، WhatBot Pro",
+      en: "AI chatbot, WhatBot Pro, broadcasts and team inbox",
+      ur_roman: "AI chatbot, WhatBot Pro, broadcasts aur team inbox",
+      ur: "اے آئی چیٹ بوٹ، WhatBot Pro، براڈکاسٹ اور ٹیم ان باکس",
     },
     body: {
       en: "📱 Turn WhatsApp into an intelligent sales, support and automation platform.",
@@ -161,9 +167,9 @@ const MAIN: Nodes = {
     kind: "menu",
     title: { en: "📈 Digital Marketing", ur_roman: "📈 Digital Marketing", ur: "📈 ڈیجیٹل مارکیٹنگ" },
     description: {
-      en: "SEO, Meta, Google, TikTok and LinkedIn",
-      ur_roman: "SEO, Meta, Google, TikTok aur LinkedIn",
-      ur: "ایس ای او، میٹا، گوگل، ٹک ٹاک اور لنکڈ اِن",
+      en: "SEO, social media, Google & Meta Ads, TikTok, email",
+      ur_roman: "SEO, social media, Google & Meta Ads, TikTok, email",
+      ur: "ایس ای او، سوشل میڈیا، گوگل و میٹا ایڈز، ٹک ٹاک، ای میل",
     },
     body: {
       en: "📈 Performance marketing built around one thing: qualified customers.\n\nWhich channel would you like to explore?",
@@ -172,16 +178,13 @@ const MAIN: Nodes = {
     },
     children: [
       "seo",
-      "meta_ads",
-      "google_ads",
-      "tiktok_marketing",
-      "linkedin_marketing",
       "social_media",
+      "google_ads",
+      "meta_ads",
+      "tiktok_marketing",
+      "email_marketing",
+      "influencer_marketing",
       "content_marketing",
-      "mk_lead_generation",
-      "remarketing",
-      "marketing_analytics",
-      "conversion_optimization",
     ],
     intent: "LEAD_GENERATION",
     team: "MARKETING",
@@ -189,30 +192,81 @@ const MAIN: Nodes = {
 
   web: {
     kind: "menu",
-    title: { en: "🌐 Website & Software", ur_roman: "🌐 Website & Software", ur: "🌐 ویب سائٹ و سافٹ ویئر" },
+    title: { en: "💻 Software Development", ur_roman: "💻 Software Development", ur: "💻 سافٹ ویئر ڈویلپمنٹ" },
     description: {
-      en: "Websites, e-commerce, apps, CRM, AI software",
-      ur_roman: "Websites, e-commerce, apps, CRM, AI software",
-      ur: "ویب سائٹس، ای کامرس، ایپس، سی آر ایم، اے آئی سافٹ ویئر",
+      en: "Websites, e-commerce, CRM, ERP, apps and cloud",
+      ur_roman: "Websites, e-commerce, CRM, ERP, apps aur cloud",
+      ur: "ویب سائٹس، ای کامرس، سی آر ایم، ای آر پی، ایپس اور کلاؤڈ",
     },
     body: {
-      en: "🌐 From a high-converting website to an enterprise platform — what would you like to build?",
-      ur_roman: "🌐 High-converting website se le kar enterprise platform tak — aap kya banwana chahte hain?",
-      ur: "🌐 بہترین ویب سائٹ سے لے کر انٹرپرائز پلیٹ فارم تک — آپ کیا بنوانا چاہتے ہیں؟",
+      en: "💻 From a high-converting website to ERP and cloud platforms — what would you like to build?",
+      ur_roman: "💻 High-converting website se le kar ERP aur cloud platforms tak — aap kya banwana chahte hain?",
+      ur: "💻 بہترین ویب سائٹ سے لے کر ای آر پی اور کلاؤڈ پلیٹ فارمز تک — آپ کیا بنوانا چاہتے ہیں؟",
     },
     children: [
       "business_website",
       "ecommerce",
+      "crm_development",
+      "erp_solutions",
       "web_application",
       "mobile_app",
-      "ai_website",
-      "enterprise_platform",
-      "crm_development",
-      "ai_software",
-      "custom_software",
+      "cloud_solutions",
       "api_integration",
     ],
     intent: "WEBSITE",
+    team: "WEB_SOFTWARE",
+  },
+
+  creative: {
+    kind: "menu",
+    title: { en: "🎨 Creative Services", ur_roman: "🎨 Creative Services", ur: "🎨 تخلیقی خدمات" },
+    description: {
+      en: "Branding, logo, UI/UX, graphics, video and 3D",
+      ur_roman: "Branding, logo, UI/UX, graphics, video aur 3D",
+      ur: "برانڈنگ، لوگو، UI/UX، گرافکس، ویڈیو اور تھری ڈی",
+    },
+    body: {
+      en: "🎨 Design and visual content that make your business look as good as the work you do.\n\nWhat do you need?",
+      ur_roman:
+        "🎨 Design aur visual content jo aap ke business ko utna hi behtar dikhaye jitna aap ka kaam hai.\n\nAap ko kya chahiye?",
+      ur: "🎨 ڈیزائن اور بصری مواد جو آپ کے کاروبار کو اتنا ہی بہتر دکھائے جتنا آپ کا کام ہے۔\n\nآپ کو کیا چاہیے؟",
+    },
+    children: [
+      "brand_identity",
+      "logo_design",
+      "ui_ux_design",
+      "graphic_design",
+      "video_editing",
+      "motion_graphics",
+      "animation_3d",
+      "photography",
+    ],
+    intent: "BRANDING",
+    team: "MARKETING",
+  },
+
+  enterprise_data: {
+    kind: "menu",
+    title: { en: "🏢 Enterprise & Data", ur_roman: "🏢 Enterprise & Data", ur: "🏢 انٹرپرائز اور ڈیٹا" },
+    description: {
+      en: "BI, dashboards, cloud, security and trading tech",
+      ur_roman: "BI, dashboards, cloud, security aur trading tech",
+      ur: "بی آئی، ڈیش بورڈز، کلاؤڈ، سیکیورٹی اور ٹریڈنگ ٹیک",
+    },
+    body: {
+      en: "🏢 Technology for organisations that run on data — from business intelligence and secure cloud infrastructure to algorithmic trading.\n\nWhat would you like to explore?",
+      ur_roman:
+        "🏢 Data par chalne wale idaron ke liye technology — business intelligence aur mehfooz cloud infrastructure se le kar algorithmic trading tak.\n\nAap kya dekhna chahenge?",
+      ur: "🏢 ڈیٹا پر چلنے والے اداروں کے لیے ٹیکنالوجی — بزنس انٹیلیجنس اور محفوظ کلاؤڈ انفراسٹرکچر سے لے کر الگورتھمک ٹریڈنگ تک۔\n\nآپ کیا دیکھنا چاہیں گے؟",
+    },
+    children: [
+      "business_intelligence",
+      "analytics_dashboards",
+      "cloud_solutions",
+      "cyber_security",
+      "enterprise_platform",
+      "trading_tech",
+    ],
     team: "WEB_SOFTWARE",
   },
 
@@ -381,7 +435,7 @@ const GROW: Nodes = {
   },
 };
 
-// ------------------------------------------------------- AI & Automation ----
+// --------------------------------------------------------- AI Automation ----
 
 const AI: Nodes = {
   ai_agents: {
@@ -408,33 +462,6 @@ const AI: Nodes = {
         "Processing orders, forms and documents",
       ],
       next: "Book a free consultation and we'll map where an agent fits your operations.",
-    }),
-    actions: SERVICE_ACTIONS,
-  },
-  ai_chatbots: {
-    kind: "service",
-    title: { en: "💬 AI Chatbots" },
-    description: { en: "Trained on your business, live on every channel" },
-    intent: "AI_CUSTOMER_SUPPORT",
-    team: "AI_AUTOMATION",
-    serviceSlug: "ai-chatbots",
-    subService: "AI Chatbots",
-    body: explain({
-      title: "💬 AI Chatbots",
-      does: "A chatbot trained on your own services, policies and FAQs that answers customers instantly on your website, WhatsApp, Instagram or Messenger — and hands the conversation to your team when it needs a person.",
-      who: "Businesses that receive the same questions every day, or lose enquiries that arrive after hours.",
-      benefits: [
-        "Instant replies, day and night",
-        "Leads captured into your CRM automatically",
-        "Answers in English, Urdu and Roman Urdu",
-        "Smooth handover to your team",
-      ],
-      uses: [
-        "Answering product and pricing questions",
-        "Booking appointments and consultations",
-        "Collecting enquiry details before a sales call",
-      ],
-      next: "Book a consultation and we'll design the conversations your chatbot should handle.",
     }),
     actions: SERVICE_ACTIONS,
   },
@@ -492,14 +519,14 @@ const AI: Nodes = {
   },
   crm_automation: {
     kind: "service",
-    title: { en: "🧾 CRM Automation" },
-    description: { en: "A CRM that updates and follows up on its own" },
+    title: { en: "🔗 CRM Integration" },
+    description: { en: "Connect AI and automation to your CRM" },
     intent: "CRM",
     team: "AI_AUTOMATION",
-    subService: "CRM Automation",
+    subService: "CRM Integration",
     body: explain({
-      title: "🧾 CRM Automation",
-      does: "We set up or upgrade your CRM so every lead is captured, scored, assigned and followed up automatically — from WhatsApp, your website, ads and calls.",
+      title: "🔗 CRM Integration",
+      does: "We connect AI and automation to your CRM — or set one up — so every lead from WhatsApp, your website, ads and calls is captured, scored, assigned and followed up automatically.",
       who: "Sales teams losing track of leads, or managers without a clear view of the pipeline.",
       benefits: [
         "No lead left without a follow-up",
@@ -570,30 +597,56 @@ const AI: Nodes = {
     }),
     actions: SERVICE_ACTIONS,
   },
-  ai_receptionist: {
+  lead_systems: {
     kind: "service",
-    title: { en: "🧑‍💼 AI Receptionist" },
-    description: { en: "Greets, answers, books and routes enquiries" },
-    intent: "AI_AGENT",
+    title: { en: "🎯 Lead Gen Systems" },
+    description: { en: "Automated pipelines that find and qualify buyers" },
+    intent: "LEAD_GENERATION",
     team: "AI_AUTOMATION",
-    serviceSlug: "ai-agents",
-    subService: "AI Receptionist",
+    subService: "Lead Generation Systems",
     body: explain({
-      title: "🧑‍💼 AI Receptionist",
-      does: "A virtual front desk that greets every enquiry, answers common questions, books appointments into your calendar and routes each request to the right person.",
-      who: "Clinics, agencies, real estate offices, salons and service businesses where missed enquiries mean missed revenue.",
+      title: "🎯 Lead Generation Systems",
+      does: "An automated pipeline that captures enquiries from your ads, website and WhatsApp, asks your qualifying questions, scores each lead and routes the serious ones to your sales team — with follow-ups sent automatically.",
+      who: "Businesses that get plenty of enquiries but lose time on unqualified ones, or lose good leads to slow follow-up.",
       benefits: [
-        "No enquiry goes unanswered",
-        "Appointments booked without back-and-forth",
-        "Front-desk staff freed for in-person customers",
-        "Reminders reduce missed appointments",
+        "Every enquiry answered and qualified",
+        "Sales time spent on serious buyers",
+        "Automatic follow-up so leads don't go cold",
+        "Each lead traced back to its source",
       ],
       uses: [
-        "Booking and rescheduling appointments",
-        "Answering location, timing and service questions",
-        "Routing urgent requests to the right staff member",
+        "Qualifying click-to-WhatsApp ad leads",
+        "Scoring website enquiries into your CRM",
+        "Booking sales calls with qualified prospects",
       ],
-      next: "Book a consultation and we'll map your front-desk workflow.",
+      next: "Book a consultation and we'll map how leads reach you today.",
+    }),
+    actions: SERVICE_ACTIONS,
+  },
+  ai_voice_agents: {
+    kind: "service",
+    title: { en: "🎙️ AI Voice Agents" },
+    description: { en: "Natural-sounding voice automation for your calls" },
+    intent: "AI_VOICE_AGENT",
+    team: "AI_AUTOMATION",
+    serviceSlug: "ai-agents",
+    subService: "AI Voice Agents",
+    body: explain({
+      title: "🎙️ AI Voice Agents",
+      does: "AI agents that speak with your customers on the phone — answering inbound calls, making follow-up and reminder calls, qualifying leads and booking appointments — and transferring to a person when needed.",
+      who: "Businesses that handle a high volume of calls, miss calls after hours, or spend staff time on routine phone follow-ups.",
+      benefits: [
+        "Calls answered day and night",
+        "Routine calls handled without extra staff",
+        "Consistent script and qualification",
+        "Call summaries saved to your CRM",
+      ],
+      uses: [
+        "Answering and routing inbound enquiries",
+        "Appointment booking and reminder calls",
+        "Following up on new leads by phone",
+      ],
+      next: "Book a consultation and we'll review which calls an agent can take on first.",
     }),
     actions: SERVICE_ACTIONS,
   },
@@ -623,35 +676,9 @@ const AI: Nodes = {
     }),
     actions: SERVICE_ACTIONS,
   },
-  custom_ai: {
-    kind: "service",
-    title: { en: "🛠️ Custom AI Solution" },
-    description: { en: "AI designed around your specific problem" },
-    intent: "AI_AUTOMATION",
-    team: "AI_AUTOMATION",
-    subService: "Custom AI Solution",
-    body: explain({
-      title: "🛠️ Custom AI Solution",
-      does: "When an off-the-shelf tool doesn't fit, we design and build AI around your data and process — from document understanding and recommendations to internal copilots.",
-      who: "Businesses with a clear problem, their own data, and a process no standard product handles well.",
-      benefits: [
-        "Built around your exact process",
-        "Your data stays under your control",
-        "Integrates with your existing systems",
-        "Scoped in phases to prove value early",
-      ],
-      uses: [
-        "Reading and extracting data from documents",
-        "Internal knowledge assistants for staff",
-        "Product or content recommendations",
-      ],
-      next: "Book a consultation and describe the problem you'd like AI to solve.",
-    }),
-    actions: SERVICE_ACTIONS,
-  },
 };
 
-// --------------------------------------------------- WhatsApp Solutions -----
+// ------------------------------------ WhatsApp AI Chatbots (in AI Automation) --
 
 const WHATSAPP_ACTIONS = ["book_demo", "view_pricing", "talk_to_sales"];
 
@@ -1005,33 +1032,6 @@ const MARKETING: Nodes = {
     }),
     actions: MARKETING_ACTIONS,
   },
-  linkedin_marketing: {
-    kind: "service",
-    title: { en: "💼 LinkedIn Marketing" },
-    description: { en: "B2B leads, LinkedIn Ads and thought leadership" },
-    intent: "SOCIAL_MEDIA",
-    team: "MARKETING",
-    serviceSlug: "social-media-marketing",
-    subService: "LinkedIn Marketing",
-    body: explain({
-      title: "💼 LinkedIn Marketing",
-      does: "LinkedIn Ads, company page growth and founder thought leadership for B2B businesses that sell to decision-makers.",
-      who: "B2B companies, consultancies, SaaS and professional services targeting specific industries or job titles.",
-      benefits: [
-        "Target by industry, company size and role",
-        "Build authority with decision-makers",
-        "Lead gen forms connected to your CRM",
-        "Account-based campaigns for key prospects",
-      ],
-      uses: [
-        "B2B lead generation campaigns",
-        "Recruiting and employer branding",
-        "Founder-led content programmes",
-      ],
-      next: "Get a quote or book a strategy call.",
-    }),
-    actions: MARKETING_ACTIONS,
-  },
   social_media: {
     kind: "service",
     title: { en: "📱 Social Media" },
@@ -1065,7 +1065,7 @@ const MARKETING: Nodes = {
     description: { en: "Content that builds trust and ranks" },
     intent: "CONTENT",
     team: "MARKETING",
-    serviceSlug: "digital-marketing",
+    serviceSlug: "content-marketing",
     subService: "Content Marketing",
     body: explain({
       title: "✍️ Content Marketing",
@@ -1113,102 +1113,75 @@ const MARKETING: Nodes = {
     }),
     actions: ["get_quote", "book_strategy_call", "talk_to_expert"],
   },
-  remarketing: {
+  email_marketing: {
     kind: "service",
-    title: { en: "🔄 Remarketing" },
-    description: { en: "Bring back people who showed interest" },
-    intent: "META_ADS",
+    title: { en: "📧 Email Marketing" },
+    description: { en: "Automated sequences that nurture and sell" },
+    intent: "EMAIL_MARKETING",
     team: "MARKETING",
     serviceSlug: "digital-marketing",
-    subService: "Remarketing",
+    subService: "Email Marketing",
     body: explain({
-      title: "🔄 Remarketing",
-      does: "Retargeting campaigns on Meta, Google, YouTube and TikTok that re-engage website visitors, video viewers and past enquiries with the right message.",
-      who: "Businesses with website or social traffic that doesn't convert on the first visit.",
+      title: "📧 Email Marketing",
+      does: "Email campaigns and automated sequences — welcome series, nurture flows, offers and newsletters — written, designed and set up on your email platform, connected to your CRM or store.",
+      who: "Businesses with a customer or lead list they aren't using, or buyers who need several touches before they decide.",
       benefits: [
-        "Stay visible while buyers decide",
-        "Messages matched to what they viewed",
-        "Better return from existing traffic",
-        "Audience lists built and maintained",
+        "Stay in touch with leads automatically",
+        "Repeat sales from existing customers",
+        "Messages triggered by what customers do",
+        "Open, click and sales reporting",
       ],
       uses: [
-        "Abandoned cart recovery",
-        "Following up on pricing page visitors",
-        "Re-engaging past WhatsApp enquiries",
+        "Welcome and nurture sequences for new leads",
+        "Abandoned cart and re-order emails",
+        "Monthly newsletters and offers",
       ],
       next: "Get a quote or book a strategy call.",
     }),
     actions: MARKETING_ACTIONS,
   },
-  marketing_analytics: {
+  influencer_marketing: {
     kind: "service",
-    title: { en: "📊 Marketing Analytics" },
-    description: { en: "Tracking, attribution and dashboards" },
-    intent: "LEAD_GENERATION",
+    title: { en: "🤝 Influencer Marketing" },
+    description: { en: "Creator partnerships that build trust at scale" },
+    intent: "INFLUENCER_MARKETING",
     team: "MARKETING",
-    serviceSlug: "digital-marketing",
-    subService: "Marketing Analytics",
+    serviceSlug: "social-media-marketing",
+    subService: "Influencer Marketing",
     body: explain({
-      title: "📊 Marketing Analytics",
-      does: "Google Analytics 4, Tag Manager, Meta Conversions API and CRM attribution set up correctly — with dashboards that show which channels bring revenue.",
-      who: "Businesses spending on marketing without confidence in which campaigns actually work.",
+      title: "🤝 Influencer Marketing",
+      does: "We find creators whose audience matches your customers, agree the brief and terms, manage the content and track the results of each collaboration.",
+      who: "Consumer brands, product launches and online stores that want trusted recommendations to reach new buyers.",
       benefits: [
-        "Accurate conversion tracking",
-        "Spend decisions based on real data",
-        "One dashboard for all channels",
-        "Leads traced back to campaigns",
+        "Creators matched to your audience",
+        "Briefs and approvals handled for you",
+        "Content you can reuse in ads",
+        "Results tracked per creator",
       ],
       uses: [
-        "GA4 and Tag Manager setup",
-        "Offline conversion import from your CRM",
-        "Management reporting dashboards",
+        "Product launches and seeding",
+        "User-generated content for ads",
+        "Campaigns with local creators in your city",
       ],
       next: "Get a quote or book a strategy call.",
-    }),
-    actions: MARKETING_ACTIONS,
-  },
-  conversion_optimization: {
-    kind: "service",
-    title: { en: "🧪 Conversion (CRO)" },
-    description: { en: "Turn more of your visitors into customers" },
-    intent: "WEBSITE",
-    team: "MARKETING",
-    serviceSlug: "digital-marketing",
-    subService: "Conversion Optimization",
-    body: explain({
-      title: "🧪 Conversion Optimization",
-      does: "We study how visitors use your website and landing pages, then test changes to offers, layout, forms and speed so more of them become enquiries or sales.",
-      who: "Businesses with traffic that isn't turning into enough leads or orders.",
-      benefits: [
-        "More results from the same ad spend",
-        "Decisions backed by tests, not guesses",
-        "Faster, clearer landing pages",
-        "Fewer drop-offs in forms and checkout",
-      ],
-      uses: [
-        "Landing page redesign and A/B tests",
-        "Checkout and form optimisation",
-        "Page speed improvements",
-      ],
-      next: "Share your website and we'll review it on a strategy call.",
     }),
     actions: MARKETING_ACTIONS,
   },
 };
 
-// ------------------------------------------------------ Website & Software --
+// ---------------------------------------------------- Software Development --
 
 const WEB: Nodes = {
   business_website: {
     kind: "service",
-    title: { en: "🌐 Business Website" },
-    description: { en: "Fast, premium sites built to convert" },
+    title: { en: "🌐 Website Development" },
+    description: { en: "Fast, SEO-ready sites built to convert" },
     intent: "WEBSITE",
     team: "WEB_SOFTWARE",
     serviceSlug: "website-development",
-    subService: "Business Website",
+    subService: "Website Development",
     body: explain({
-      title: "🌐 Business Website",
+      title: "🌐 Website Development",
       does: "A fast, mobile-first website that presents your business with authority and turns visitors into enquiries — with SEO foundations, WhatsApp and CRM connections built in.",
       who: "Businesses whose website is outdated, slow, or not generating enquiries.",
       benefits: [
@@ -1255,14 +1228,14 @@ const WEB: Nodes = {
   },
   web_application: {
     kind: "service",
-    title: { en: "💻 Web Application" },
+    title: { en: "💻 Web Applications" },
     description: { en: "Portals, dashboards and SaaS products" },
     intent: "SOFTWARE",
     team: "WEB_SOFTWARE",
     serviceSlug: "software-development",
     subService: "Web Application",
     body: explain({
-      title: "💻 Web Application",
+      title: "💻 Web Applications",
       does: "Custom web applications — customer portals, internal dashboards, booking systems and SaaS products — designed, built, tested and deployed by one team.",
       who: "Businesses with a process or product idea that off-the-shelf software doesn't cover.",
       benefits: [
@@ -1282,14 +1255,14 @@ const WEB: Nodes = {
   },
   mobile_app: {
     kind: "service",
-    title: { en: "📱 Mobile App" },
-    description: { en: "iOS and Android apps" },
+    title: { en: "📱 Mobile Apps" },
+    description: { en: "Native and cross-platform iOS and Android apps" },
     intent: "MOBILE_APP",
     team: "WEB_SOFTWARE",
     serviceSlug: "mobile-apps",
     subService: "Mobile App",
     body: explain({
-      title: "📱 Mobile App",
+      title: "📱 Mobile Apps",
       does: "iOS and Android apps built with modern cross-platform technology — from design and development to App Store and Play Store launch.",
       who: "Businesses whose customers or staff need a fast, dedicated experience on their phone.",
       benefits: [
@@ -1307,43 +1280,16 @@ const WEB: Nodes = {
     }),
     actions: BUILD_ACTIONS,
   },
-  ai_website: {
-    kind: "service",
-    title: { en: "🧠 AI Website" },
-    description: { en: "A website with an AI assistant built in" },
-    intent: "WEBSITE",
-    team: "WEB_SOFTWARE",
-    serviceSlug: "website-development",
-    subService: "AI Website",
-    body: explain({
-      title: "🧠 AI Website",
-      does: "A modern website with AI built in — an assistant that answers visitors, qualifies leads and books calls, plus content structured for AI search engines.",
-      who: "Businesses that want their website to work as a salesperson, not just a brochure.",
-      benefits: [
-        "Visitors get answers without waiting",
-        "Leads qualified before they reach sales",
-        "Structured for Google and AI search",
-        "Conversations feed your CRM",
-      ],
-      uses: [
-        "Service businesses with complex offerings",
-        "Real estate and property listings",
-        "Consultancies and professional firms",
-      ],
-      next: "Plan your project — a few questions and we'll prepare a brief.",
-    }),
-    actions: BUILD_ACTIONS,
-  },
   enterprise_platform: {
     kind: "service",
-    title: { en: "🏢 Enterprise Platform" },
-    description: { en: "Large-scale systems for complex organisations" },
+    title: { en: "🏢 Enterprise Software" },
+    description: { en: "Custom platforms for complex operations" },
     intent: "ENTERPRISE",
     team: "ENTERPRISE",
     serviceSlug: "software-development",
-    subService: "Enterprise Platform",
+    subService: "Enterprise Software",
     body: explain({
-      title: "🏢 Enterprise Platform",
+      title: "🏢 Enterprise Software",
       does: "Enterprise-grade platforms — multi-branch operations, role-based access, integrations with ERP and CRM, reporting and AI — designed with your IT and business teams.",
       who: "Organisations with multiple departments, branches or systems that need to work as one.",
       benefits: [
@@ -1388,32 +1334,59 @@ const WEB: Nodes = {
     }),
     actions: BUILD_ACTIONS,
   },
-  ai_software: {
+  erp_solutions: {
     kind: "service",
-    title: { en: "🤖 AI Software" },
-    description: { en: "Products and tools powered by AI" },
-    intent: "SOFTWARE",
+    title: { en: "🏭 ERP Solutions" },
+    description: { en: "Unify operations across your entire business" },
+    intent: "ERP",
     team: "WEB_SOFTWARE",
     serviceSlug: "software-development",
-    subService: "AI Software",
+    subService: "ERP Solutions",
     body: explain({
-      title: "🤖 AI Software",
-      does: "Software products with AI at the core — assistants, document processing, recommendations and analytics — integrated with leading AI models and your data.",
-      who: "Businesses building an AI product, or adding AI features to an existing one.",
+      title: "🏭 ERP Solutions",
+      does: "ERP systems that bring inventory, purchasing, sales, accounts, HR and production into one platform — custom-built around your process, or set up and customised on an established ERP.",
+      who: "Growing businesses running departments on separate spreadsheets and tools that don't talk to each other.",
       benefits: [
-        "Practical AI features users actually use",
-        "Model choice matched to cost and quality",
-        "Your data protected by design",
-        "Built to evolve as models improve",
+        "One source of truth for the whole business",
+        "Stock, orders and accounts kept in sync",
+        "Role-based access for each department",
+        "Reports management can act on",
       ],
       uses: [
-        "AI assistants inside SaaS products",
-        "Document and invoice processing",
-        "Search and recommendation features",
+        "Manufacturing and production planning",
+        "Distribution, wholesale and multi-warehouse stock",
+        "Retail chains with several branches",
       ],
       next: "Plan your project — a few questions and we'll prepare a brief.",
     }),
     actions: BUILD_ACTIONS,
+  },
+  cloud_solutions: {
+    kind: "service",
+    title: { en: "☁️ Cloud Solutions" },
+    description: { en: "Cloud infrastructure that scales with you" },
+    intent: "CLOUD",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "software-development",
+    subService: "Cloud Solutions",
+    body: explain({
+      title: "☁️ Cloud Solutions",
+      does: "Cloud setup, migration and management on AWS, Azure or Google Cloud — servers, databases, backups, monitoring and deployment pipelines designed for reliability and cost control.",
+      who: "Businesses moving off shared hosting or office servers, or whose applications need to serve more users reliably.",
+      benefits: [
+        "Infrastructure that scales with demand",
+        "Automated backups and monitoring",
+        "Security configured from the start",
+        "Hosting costs reviewed and kept in check",
+      ],
+      uses: [
+        "Migrating applications and data to the cloud",
+        "Hosting for web apps, APIs and databases",
+        "Deployment pipelines for faster releases",
+      ],
+      next: "Book a consultation and we'll review your current setup.",
+    }),
+    actions: SERVICE_ACTIONS,
   },
   custom_software: {
     kind: "service",
@@ -1444,15 +1417,15 @@ const WEB: Nodes = {
   },
   api_integration: {
     kind: "service",
-    title: { en: "🔗 API Integration" },
-    description: { en: "Connect your systems, payments and platforms" },
+    title: { en: "🔗 API Development" },
+    description: { en: "APIs and integrations that connect your stack" },
     intent: "SOFTWARE",
     team: "WEB_SOFTWARE",
     serviceSlug: "software-development",
-    subService: "API Integration",
+    subService: "API Development",
     body: explain({
-      title: "🔗 API Integration",
-      does: "Reliable integrations between your software and third-party platforms — payment gateways, couriers, WhatsApp, CRMs, ERPs and AI APIs — with monitoring and error handling.",
+      title: "🔗 API Development",
+      does: "APIs for your own products, and reliable integrations with third-party platforms — payment gateways, couriers, WhatsApp, CRMs, ERPs and AI APIs — with monitoring and error handling.",
       who: "Businesses whose systems don't talk to each other, or rely on fragile manual exports.",
       benefits: [
         "Data flows automatically and reliably",
@@ -1468,6 +1441,340 @@ const WEB: Nodes = {
       next: "Plan your project — a few questions and we'll prepare a brief.",
     }),
     actions: BUILD_ACTIONS,
+  },
+};
+
+// ------------------------------------------------------- Creative Services --
+
+const CREATIVE: Nodes = {
+  brand_identity: {
+    kind: "service",
+    title: { en: "✨ Brand Identity" },
+    description: { en: "Strategic positioning and visual systems" },
+    intent: "BRANDING",
+    team: "MARKETING",
+    serviceSlug: "branding",
+    subService: "Brand Identity",
+    body: explain({
+      title: "✨ Brand Identity",
+      does: "Brand strategy, positioning and a complete visual identity — logo, colours, typography and brand guidelines — so your business looks consistent and credible everywhere it appears.",
+      who: "New businesses launching a brand, and established ones whose image no longer matches the quality of their work.",
+      benefits: [
+        "Consistent look across every touchpoint",
+        "Clear positioning against competitors",
+        "Guidelines your team and vendors can follow",
+        "A professional first impression",
+      ],
+      uses: [
+        "New brand launches",
+        "Rebranding an established business",
+        "Sub-brands for a new product or service",
+      ],
+      next: "Get a quote or book a strategy call to discuss your brand.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  logo_design: {
+    kind: "service",
+    title: { en: "✒️ Logo Design" },
+    description: { en: "Distinct marks that command recognition" },
+    intent: "BRANDING",
+    team: "MARKETING",
+    serviceSlug: "branding",
+    subService: "Logo Design",
+    body: explain({
+      title: "✒️ Logo Design",
+      does: "A logo designed from a short brand brief — concepts, refinement and final files in every format you need for print, signage, social media and the web.",
+      who: "Businesses starting out, or those whose current logo looks dated, unclear or hard to use.",
+      benefits: [
+        "A mark that is distinct and memorable",
+        "Works at every size, from app icon to billboard",
+        "Vector files for print and digital",
+        "Colour and usage guidance included",
+      ],
+      uses: [
+        "Logos for new businesses and products",
+        "Refreshing an existing logo",
+        "Logo variations for social media and apps",
+      ],
+      next: "Get a quote and tell us about your business.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  ui_ux_design: {
+    kind: "service",
+    title: { en: "🧩 UI/UX Design" },
+    description: { en: "Interfaces designed for clarity and conversion" },
+    intent: "UI_UX_DESIGN",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "ui-ux",
+    subService: "UI/UX Design",
+    body: explain({
+      title: "🧩 UI/UX Design",
+      does: "User research, wireframes, prototypes and polished interface design for websites, web apps and mobile apps — tested with real users before development begins.",
+      who: "Teams building a new product, or businesses whose website or app confuses users and loses them.",
+      benefits: [
+        "Screens that are easy to understand",
+        "Problems caught before code is written",
+        "A design system that keeps things consistent",
+        "Developer-ready files in Figma",
+      ],
+      uses: [
+        "App and SaaS product design",
+        "Website redesigns focused on conversion",
+        "Dashboard and portal interfaces",
+      ],
+      next: "Plan your project — a few questions and we'll prepare a brief.",
+    }),
+    actions: BUILD_ACTIONS,
+  },
+  graphic_design: {
+    kind: "service",
+    title: { en: "🎨 Graphic Design" },
+    description: { en: "Visuals that elevate every touchpoint" },
+    intent: "GRAPHIC_DESIGN",
+    team: "MARKETING",
+    serviceSlug: "branding",
+    subService: "Graphic Design",
+    body: explain({
+      title: "🎨 Graphic Design",
+      does: "Design for everything your brand puts in front of customers — social media posts, ad creatives, brochures, flyers, packaging, presentations and signage.",
+      who: "Businesses that need a steady supply of on-brand visuals without hiring an in-house designer.",
+      benefits: [
+        "Consistent, on-brand visuals",
+        "Creatives sized for every platform",
+        "Quick turnaround for campaigns",
+        "Print-ready and digital files",
+      ],
+      uses: [
+        "Monthly social media and ad creatives",
+        "Brochures, catalogues and company profiles",
+        "Packaging and product labels",
+      ],
+      next: "Get a quote or book a strategy call.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  video_editing: {
+    kind: "service",
+    title: { en: "🎬 Video Editing" },
+    description: { en: "Polished edits for ads, reels and campaigns" },
+    intent: "VIDEO",
+    team: "MARKETING",
+    serviceSlug: "content-marketing",
+    subService: "Video Editing",
+    body: explain({
+      title: "🎬 Video Editing",
+      does: "Professional editing of your footage into ads, reels, YouTube videos and brand films — with captions, sound, colour and formats sized for each platform.",
+      who: "Businesses with footage to publish, or brands that need regular video for social media and ads.",
+      benefits: [
+        "Videos cut for how each platform is watched",
+        "Captions for sound-off viewing",
+        "A consistent style across your videos",
+        "Versions for every ad placement",
+      ],
+      uses: [
+        "Short-form reels and TikToks",
+        "Video ads for Meta, TikTok and YouTube",
+        "Testimonial and company profile videos",
+      ],
+      next: "Get a quote or book a strategy call.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  motion_graphics: {
+    kind: "service",
+    title: { en: "🌀 Motion Graphics" },
+    description: { en: "Animated storytelling that grabs attention" },
+    intent: "VIDEO",
+    team: "MARKETING",
+    serviceSlug: "content-marketing",
+    subService: "Motion Graphics",
+    body: explain({
+      title: "🌀 Motion Graphics",
+      does: "Animated graphics, kinetic text and explainer videos that make your product, service or message easy to understand in seconds.",
+      who: "Businesses with a product or process that is hard to show on camera, and brands that want scroll-stopping ad creatives.",
+      benefits: [
+        "Complex ideas explained simply",
+        "Eye-catching ads and social posts",
+        "Animated logo and brand elements",
+        "No filming required",
+      ],
+      uses: [
+        "Explainer videos for products and services",
+        "Animated ads and social media posts",
+        "Logo animations and video intros",
+      ],
+      next: "Get a quote or book a strategy call.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  animation_3d: {
+    kind: "service",
+    title: { en: "🧊 3D Animation" },
+    description: { en: "Immersive visuals for standout campaigns" },
+    intent: "VIDEO",
+    team: "MARKETING",
+    serviceSlug: "content-marketing",
+    subService: "3D Animation",
+    body: explain({
+      title: "🧊 3D Animation",
+      does: "3D models, product renders and animations that show your product, property or concept in detail — even before it physically exists.",
+      who: "Product brands, real estate developers and manufacturers that need visuals a camera can't capture.",
+      benefits: [
+        "Show products from every angle",
+        "Visualise projects before they are built",
+        "Premium visuals for ads and launches",
+        "3D assets you can reuse",
+      ],
+      uses: [
+        "Product renders and 360° showcases",
+        "Architectural and real estate walkthroughs",
+        "3D animated ads and launch videos",
+      ],
+      next: "Get a quote or book a strategy call.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+  photography: {
+    kind: "service",
+    title: { en: "📸 Photography" },
+    description: { en: "Professional imagery for brand and product" },
+    intent: "PHOTOGRAPHY",
+    team: "MARKETING",
+    serviceSlug: "branding",
+    subService: "Photography",
+    body: explain({
+      title: "📸 Photography",
+      does: "Product, food, corporate and lifestyle photography — planned around where the images will be used, then edited and delivered ready for your website, ads and social media.",
+      who: "Businesses selling online, launching products, or relying on phone photos that undersell their quality.",
+      benefits: [
+        "Images that build trust and sell",
+        "A consistent style across your catalogue",
+        "Edited and sized for each platform",
+        "Usable across web, ads and print",
+      ],
+      uses: [
+        "E-commerce product photography",
+        "Team, office and corporate shoots",
+        "Food and menu photography",
+      ],
+      next: "Get a quote or book a strategy call.",
+    }),
+    actions: MARKETING_ACTIONS,
+  },
+};
+
+// ------------------------------------------------------- Enterprise & Data --
+
+const DATA: Nodes = {
+  business_intelligence: {
+    kind: "service",
+    title: { en: "📊 Business Intelligence" },
+    description: { en: "Turn raw data into decisive action" },
+    intent: "DATA_ANALYTICS",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "software-development",
+    subService: "Business Intelligence",
+    body: explain({
+      title: "📊 Business Intelligence",
+      does: "We bring data from your sales, finance, operations and marketing systems into one place, clean it and model it — so management can answer questions with numbers instead of guesswork.",
+      who: "Businesses with data spread across spreadsheets, software and branches, and no single view of performance.",
+      benefits: [
+        "One trusted view of the business",
+        "Reports that update themselves",
+        "Trends and problems spotted early",
+        "Decisions backed by data",
+      ],
+      uses: [
+        "Sales and profitability analysis across branches",
+        "Inventory and supply chain reporting",
+        "Forecasting demand from historical data",
+      ],
+      next: "Book a consultation and tell us which decisions you'd like better data for.",
+    }),
+    actions: SERVICE_ACTIONS,
+  },
+  analytics_dashboards: {
+    kind: "service",
+    title: { en: "📈 Analytics Dashboards" },
+    description: { en: "Real-time visibility into what matters" },
+    intent: "DATA_ANALYTICS",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "software-development",
+    subService: "Analytics Dashboards",
+    body: explain({
+      title: "📈 Analytics Dashboards",
+      does: "Live dashboards — in Power BI, Looker Studio or built into your own software — showing the numbers each team needs, updated automatically from your systems.",
+      who: "Owners and managers who wait for weekly reports, or build them by hand.",
+      benefits: [
+        "Key numbers visible at a glance",
+        "Data refreshed automatically",
+        "A view for each role and team",
+        "Available on desktop and mobile",
+      ],
+      uses: [
+        "Sales and marketing performance dashboards",
+        "Operations and branch KPI dashboards",
+        "Financial and cash-flow overviews",
+      ],
+      next: "Book a consultation and we'll outline your first dashboard.",
+    }),
+    actions: SERVICE_ACTIONS,
+  },
+  cyber_security: {
+    kind: "service",
+    title: { en: "🛡️ Cyber Security" },
+    description: { en: "Protect systems, data and customer trust" },
+    intent: "CYBER_SECURITY",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "software-development",
+    subService: "Cyber Security",
+    body: explain({
+      title: "🛡️ Cyber Security",
+      does: "Security reviews of your websites, applications and cloud setup, followed by fixes and hardening — access controls, backups, updates, SSL and monitoring — to reduce the risk of breaches and downtime.",
+      who: "Businesses that store customer data, take payments online, or have had a scare with hacking or malware.",
+      benefits: [
+        "Weaknesses found and fixed early",
+        "Customer data better protected",
+        "Backups and recovery you can rely on",
+        "A clear list of risks and fixes",
+      ],
+      uses: [
+        "Website and application security reviews",
+        "Recovering and securing a hacked website",
+        "Access control and backup policies for teams",
+      ],
+      next: "Book a consultation and we'll discuss what you need to protect.",
+    }),
+    actions: SERVICE_ACTIONS,
+  },
+  trading_tech: {
+    kind: "service",
+    title: { en: "💹 Trading Tech" },
+    description: { en: "Algorithmic trading systems for PSX, PMEX and crypto" },
+    intent: "TRADING_TECH",
+    team: "WEB_SOFTWARE",
+    serviceSlug: "trading-tech",
+    subService: "Trading Tech",
+    body: explain({
+      title: "💹 Trading Tech",
+      does: "Custom algorithmic trading systems for the Pakistan Stock Exchange (PSX), PMEX and crypto exchanges — trading bots, backtesting, execution engines and real-time risk dashboards, built around your own strategy.",
+      who: "Traders, investors, proprietary desks and asset managers who want to automate a strategy and run it with discipline.",
+      benefits: [
+        "Your rules executed consistently, without emotion",
+        "Strategies backtested on historical data first",
+        "Real-time risk and drawdown alerts",
+        "Dashboards to monitor, adjust or pause strategies",
+      ],
+      uses: [
+        "Signal and execution bots for PSX equities",
+        "Crypto bots for major exchanges",
+        "Backtesting and paper-trading a new strategy",
+      ],
+      next: "Book a consultation and walk us through your strategy.",
+    }),
+    actions: SERVICE_ACTIONS,
   },
 };
 
@@ -1646,7 +1953,19 @@ const SUPPORT: Nodes = {
 
 export const DEFAULT_MENU: BotConfig["menu"] = {
   root: "root",
-  nodes: { ...MAIN, ...GROW, ...AI, ...WHATSAPP, ...MARKETING, ...WEB, ...WORK, ...EXPERT, ...SUPPORT },
+  nodes: {
+    ...MAIN,
+    ...GROW,
+    ...AI,
+    ...WHATSAPP,
+    ...MARKETING,
+    ...WEB,
+    ...CREATIVE,
+    ...DATA,
+    ...WORK,
+    ...EXPERT,
+    ...SUPPORT,
+  },
 };
 
 // ----------------------------------------------------------------- Actions --

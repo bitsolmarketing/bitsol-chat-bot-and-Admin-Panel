@@ -357,6 +357,57 @@ export const MARKETING_SERVICES: ServiceItem[] = [
   },
 
   {
+    slug: "content-marketing",
+    name: "Content Marketing",
+    group: "Marketing & Growth",
+    tagline: "Content that attracts, engages and converts at every stage.",
+    overview:
+      "Content marketing systems that bring in qualified leads and build authority — SEO-optimised articles, case studies, email sequences, video scripts, social media content and lead magnets, each mapped to a keyword, a buyer persona and a stage of the customer journey, and measured by traffic and leads rather than page views.",
+    benefits: [
+      "Attract qualified prospects through content that ranks on Google",
+      "Build authority so buyers trust you before they speak to your team",
+      "Evergreen content that keeps generating enquiries after it's published",
+      "Less dependence on paid ads as organic traffic grows",
+    ],
+    features: [
+      "SEO-optimised blog and article writing",
+      "Email marketing sequences",
+      "Social media content production",
+      "Lead magnets and landing page copy",
+      "Content in English and Urdu",
+    ],
+    process: [
+      "Content audit — existing content, gaps and the buyer's journey",
+      "Strategy and a 90-day calendar with keyword targets and formats",
+      "Production, reviewed before publishing",
+      "Distribution through email and social, and promotion for reach and backlinks",
+      "Monthly reporting on traffic, leads and top-performing content",
+    ],
+    pricing: {
+      startingAt: "From PKR 30,000 / month",
+      model: "Monthly retainer; full inbound packages (content, email, social, distribution) above",
+      note: PRICE_NOTE,
+    },
+    portfolio: [],
+    faqs: [
+      {
+        question: "Do you write content in English and Urdu?",
+        answer:
+          "Yes. We write in English, Urdu or both, depending on who you want to reach.",
+      },
+      {
+        question: "Can you handle social media content production?",
+        answer:
+          "Yes — captions, graphic briefs and video scripts for Instagram, Facebook, LinkedIn and TikTok, and we can manage scheduling and publishing too.",
+      },
+    ],
+    keywords: [
+      "content marketing", "content writing", "copywriting", "blog", "articles",
+      "email sequence", "newsletter", "lead magnet",
+    ],
+  },
+
+  {
     slug: "branding",
     name: "Branding",
     group: "Brand & Design",
@@ -625,6 +676,62 @@ export const MARKETING_SERVICES: ServiceItem[] = [
     keywords: [
       "mobile app", "app", "android", "ios", "react native", "flutter",
       "play store", "app store", "mobile application",
+    ],
+  },
+
+  {
+    slug: "trading-tech",
+    name: "Trading Tech",
+    group: "Engineering",
+    tagline: "Algorithmic trading systems for PSX, PMEX and crypto markets.",
+    overview:
+      "Custom algorithmic trading technology for traders, investors and trading firms on the Pakistan Stock Exchange (PSX), PMEX and global crypto exchanges — trading bots, backtesting frameworks, execution engines and portfolio risk dashboards, built around your own strategy and rules.",
+    benefits: [
+      "Your strategy executed consistently, without emotional decisions",
+      "Strategies backtested against historical data before real capital is at risk",
+      "Real-time portfolio risk monitoring with drawdown alerts",
+      "Dashboards to monitor positions, adjust risk and pause strategies without code",
+    ],
+    features: [
+      "Algorithmic execution engines",
+      "Backtesting and paper-trading frameworks",
+      "Market-making and trend-following strategies",
+      "Real-time portfolio risk dashboards",
+      "Broker and exchange API integration (PSX brokers, Binance, Bybit, OKX)",
+    ],
+    process: [
+      "Strategy definition — trading rules, risk parameters and benchmarks",
+      "Backtesting against historical data",
+      "System architecture — execution engine, data feeds, broker API and risk controls",
+      "Paper trading against live markets",
+      "Live deployment with monitoring, alerts and ongoing refinement",
+    ],
+    pricing: {
+      startingAt: "From PKR 150,000",
+      model: "Per-project; signal bots at the lower end, full execution and risk systems above",
+      note: PRICE_NOTE,
+    },
+    portfolio: [],
+    faqs: [
+      {
+        question: "Can you build a trading bot for the Pakistan Stock Exchange (PSX)?",
+        answer:
+          "Yes. We build algorithmic trading systems for PSX, including equity trading bots and market-making algorithms, integrated with your broker's API.",
+      },
+      {
+        question: "Do you build crypto trading bots?",
+        answer:
+          "Yes — for Binance, Bybit, OKX and other major exchanges, with strategies such as grid trading, trend following, arbitrage and market making.",
+      },
+      {
+        question: "Can I run a trading bot without programming knowledge?",
+        answer:
+          "Yes. The systems come with dashboards and simple controls to monitor positions, pause strategies and adjust risk parameters without writing code.",
+      },
+    ],
+    keywords: [
+      "trading bot", "algo trading", "algorithmic trading", "psx", "pmex", "stock exchange",
+      "stock market", "crypto bot", "crypto trading", "backtesting", "trading software",
     ],
   },
 ];

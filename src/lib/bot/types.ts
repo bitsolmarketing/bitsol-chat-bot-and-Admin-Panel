@@ -54,6 +54,20 @@ export const BOT_INTENTS = [
   "GENERAL_INQUIRY",
   "HUMAN_HANDOVER",
   "ENTERPRISE",
+  // Services added to match bitsolmarketing.com. Listed last so that on a
+  // keyword tie the longer-standing intent above keeps winning.
+  "AI_VOICE_AGENT",
+  "EMAIL_MARKETING",
+  "INFLUENCER_MARKETING",
+  "ERP",
+  "CLOUD",
+  "UI_UX_DESIGN",
+  "GRAPHIC_DESIGN",
+  "VIDEO",
+  "PHOTOGRAPHY",
+  "DATA_ANALYTICS",
+  "CYBER_SECURITY",
+  "TRADING_TECH",
 ] as const;
 
 export type BotIntent = (typeof BOT_INTENTS)[number];
@@ -80,6 +94,18 @@ export const SERVICE_INTENTS: readonly BotIntent[] = [
   "MOBILE_APP",
   "BRANDING",
   "CONTENT",
+  "AI_VOICE_AGENT",
+  "EMAIL_MARKETING",
+  "INFLUENCER_MARKETING",
+  "ERP",
+  "CLOUD",
+  "UI_UX_DESIGN",
+  "GRAPHIC_DESIGN",
+  "VIDEO",
+  "PHOTOGRAPHY",
+  "DATA_ANALYTICS",
+  "CYBER_SECURITY",
+  "TRADING_TECH",
 ];
 
 export function isServiceIntent(intent: BotIntent | undefined): boolean {

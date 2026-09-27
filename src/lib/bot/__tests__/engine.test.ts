@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { TestConversation, ids, textOf, titles } from "./harness";
 
 describe("welcome and menus", () => {
-  it("greets a new conversation with the welcome message and the nine main menu options", async () => {
+  it("greets a new conversation with the welcome message and the ten main menu options", async () => {
     const chat = new TestConversation();
     const out = await chat.send("Hi");
 
@@ -11,8 +11,43 @@ describe("welcome and menus", () => {
     assert.equal(out[0].type, "list");
     assert.match(textOf(out), /Welcome to BITSOL Marketing/);
     assert.deepEqual(ids(out), [
-      "n:grow", "n:ai", "n:whatsapp", "n:marketing", "n:web", "n:work", "n:quote", "n:expert", "n:support",
+      "n:grow", "n:ai", "n:marketing", "n:web", "n:creative", "n:enterprise_data",
+      "n:work", "n:quote", "n:expert", "n:support",
     ]);
+  });
+
+  it("lists the website's services under each service group", async () => {
+    const chat = new TestConversation();
+    assert.deepEqual(ids(await chat.tap("n:ai")), [
+      "n:ai_agents", "n:business_automation", "n:whatsapp", "n:lead_systems", "n:ai_voice_agents",
+      "n:crm_automation", "n:workflow_automation", "a:main_menu",
+    ]);
+    assert.deepEqual(ids(await chat.tap("n:marketing")), [
+      "n:seo", "n:social_media", "n:google_ads", "n:meta_ads", "n:tiktok_marketing",
+      "n:email_marketing", "n:influencer_marketing", "n:content_marketing", "a:main_menu",
+    ]);
+    assert.deepEqual(ids(await chat.tap("n:web")), [
+      "n:business_website", "n:ecommerce", "n:crm_development", "n:erp_solutions", "n:web_application",
+      "n:mobile_app", "n:cloud_solutions", "n:api_integration", "a:main_menu",
+    ]);
+    assert.deepEqual(ids(await chat.tap("n:creative")), [
+      "n:brand_identity", "n:logo_design", "n:ui_ux_design", "n:graphic_design", "n:video_editing",
+      "n:motion_graphics", "n:animation_3d", "n:photography", "a:main_menu",
+    ]);
+    assert.deepEqual(ids(await chat.tap("n:enterprise_data")), [
+      "n:business_intelligence", "n:analytics_dashboards", "n:cloud_solutions", "n:cyber_security",
+      "n:enterprise_platform", "n:trading_tech", "a:main_menu",
+    ]);
+  });
+
+  it("explains Trading Tech and routes it to the web and software team", async () => {
+    const chat = new TestConversation();
+    const out = await chat.tap("n:trading_tech");
+    assert.match(textOf(out), /PSX/);
+    assert.deepEqual(ids(out), ["a:book_consultation", "a:get_quote", "a:talk_to_expert"]);
+    assert.equal(chat.details.service, "trading-tech");
+    assert.equal(chat.state.intent, "TRADING_TECH");
+    assert.equal(chat.state.team, "WEB_SOFTWARE");
   });
 
   it("pages a menu longer than ten rows and ends every sub-menu with Main Menu", async () => {
